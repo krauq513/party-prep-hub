@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PartyItem, Participant } from '@/types/party';
 import { 
   Check, 
@@ -17,7 +17,7 @@ import confetti from 'canvas-confetti';
 
 interface ItemCardProps {
   item: PartyItem;
-  participants: Participant[];
+  participants?: Participant[];
   currentParticipant: Participant;
   onTogglePersonal: (itemId: string, participantId: string) => void;
   onClaimSharedSingle: (itemId: string, participantId: string, participantName: string) => void;
@@ -26,11 +26,12 @@ interface ItemCardProps {
   onDeleteItem: (itemId: string) => void;
   onEditItem: (item: PartyItem) => void;
   onUpdateTargetQuantity?: (itemId: string, newTarget: number) => void;
+  onAddBoardGame?: (itemId: string, gameName: string, participantId: string, participantName: string) => void;
+  onRemoveBoardGame?: (itemId: string, gameId: string) => void;
 }
 
 export default function ItemCard({
   item,
-  participants,
   currentParticipant,
   onTogglePersonal,
   onClaimSharedSingle,
@@ -39,7 +40,11 @@ export default function ItemCard({
   onDeleteItem,
   onEditItem,
   onUpdateTargetQuantity,
+  onAddBoardGame,
+  onRemoveBoardGame,
 }: ItemCardProps) {
+  const [inputGameName, setInputGameName] = useState('');
+
   const triggerCelebration = () => {
     try {
       confetti({
@@ -53,14 +58,11 @@ export default function ItemCard({
   };
 
   // ==========================================
-  // 1. PERSONAL ITEM (개인 필수품)
+  // 1. PERSONAL ITEM (개인 필수품 - 각 개인이 자기 것만 확인)
   // ==========================================
   if (item.type === 'personal') {
     const completedBy = item.completedBy || [];
     const isPackedByMe = completedBy.includes(currentParticipant.id);
-    const completedCount = completedBy.length;
-    const totalParticipants = participants.length;
-    const isAllPacked = totalParticipants > 0 && completedCount >= totalParticipants;
 
     return (
       <div className={`p-4 rounded-2xl border transition-all ${
@@ -77,9 +79,9 @@ export default function ItemCard({
               <span className="text-[11px] text-slate-400 font-medium">
                 {item.category}
               </span>
-              {isAllPacked && (
+              {isPackedByMe && (
                 <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> 전원 완료!
+                  <Sparkles className="w-3 h-3" /> 내 준비 완료!
                 </span>
               )}
             </div>
@@ -121,11 +123,21 @@ export default function ItemCard({
           </button>
         </div>
 
-        {/* Participant packing list */}
+        {/* Individual-only packing status */}
         <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-          <span className="text-slate-500 dark:text-slate-400">
-            준비 완료 {completedCount} / {totalParticipants}명
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              🔒 개인 체크
+            </span>
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {currentParticipant.name}님:{' '}
+              {isPackedByMe ? (
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">챙김 완료 ✅</span>
+              ) : (
+                <span className="text-slate-400">아직 안 챙김</span>
+              )}
+            </span>
+          </div>
 
           <div className="flex items-center gap-1">
             <button
@@ -150,39 +162,33 @@ export default function ItemCard({
             </button>
           </div>
         </div>
-
-        {/* Participant Badges */}
-        <div className="flex items-center gap-1 flex-wrap mt-1.5">
-          {participants.map((p) => {
-            const packed = completedBy.includes(p.id);
-            return (
-              <span
-                key={p.id}
-                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-medium border ${
-                  packed
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                    : 'bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-800/40 dark:text-slate-500 dark:border-slate-800'
-                }`}
-              >
-                <span>{p.avatar}</span>
-                <span>{p.name}</span>
-                {packed && <Check className="w-2.5 h-2.5 text-emerald-600" />}
-              </span>
-            );
-          })}
-        </div>
       </div>
     );
   }
 
   // ==========================================
-  // 2. SHARED SINGLE ITEM (공용 단일 품목 - 여러 명 찜 가능)
+  // 2. SHARED SINGLE ITEM (공용 단일 품목 - 여러 명 찜 가능 & 보드게임 이름 등록)
   // ==========================================
   if (item.type === 'shared_single') {
+    const isBoardGame = item.name.includes('보드게임') || (item.boardGames && item.boardGames.length > 0);
     const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
     const isPledgedByMe = assignees.some((a) => a.id === currentParticipant.id);
-    const hasAnyPledge = assignees.length > 0;
-    const isDone = item.isCompleted;
+    const boardGamesList = item.boardGames || [];
+    const hasAnyPledge = assignees.length > 0 || boardGamesList.length > 0;
+    const isDone = item.isCompleted || boardGamesList.length > 0;
+
+    const handleClaimClick = () => {
+      if (isBoardGame) {
+        const game = window.prompt('가져오실 보드게임 이름을 적어주세요! (예: 스플렌더, 루미큐브, 할리갈리)');
+        if (game && game.trim()) {
+          triggerCelebration();
+          onAddBoardGame?.(item.id, game.trim(), currentParticipant.id, currentParticipant.name);
+          return;
+        }
+      }
+      triggerCelebration();
+      onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name);
+    };
 
     return (
       <div className={`p-4 rounded-2xl border transition-all ${
@@ -203,7 +209,11 @@ export default function ItemCard({
               <span className="text-[11px] text-slate-400 font-medium">
                 {item.category}
               </span>
-              {!hasAnyPledge ? (
+              {isBoardGame && boardGamesList.length > 0 ? (
+                <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-1">
+                  🎲 {boardGamesList.length}개 등록됨
+                </span>
+              ) : !hasAnyPledge ? (
                 <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" /> 아직 찜 안 됨
                 </span>
@@ -257,18 +267,88 @@ export default function ItemCard({
               </div>
             ) : (
               <button
-                onClick={() => {
-                  triggerCelebration();
-                  onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name);
-                }}
+                onClick={handleClaimClick}
                 className="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm active:scale-95 transition-all min-h-[44px] flex items-center gap-1"
               >
                 <span>🙋</span>
-                <span>{hasAnyPledge ? '나도 찜하기!' : '내가 찜하기!'}</span>
+                <span>{isBoardGame ? '🎲 게임 챙기기' : hasAnyPledge ? '나도 찜하기!' : '내가 찜하기!'}</span>
               </button>
             )}
           </div>
         </div>
+
+        {/* Board game specific registration box */}
+        {isBoardGame && (
+          <div className="mt-3 p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                <span>🎲</span>
+                <span>가져오기로 한 보드게임 목록</span>
+                <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-200/70 dark:bg-amber-900 text-amber-800 dark:text-amber-300 font-black">
+                  {boardGamesList.length}개
+                </span>
+              </span>
+            </div>
+
+            {boardGamesList.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {boardGamesList.map((bg) => {
+                  const isMine = bg.participantId === currentParticipant.id;
+                  return (
+                    <span
+                      key={bg.id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 shadow-2xs"
+                    >
+                      <span className="font-bold text-amber-800 dark:text-amber-300">🎲 {bg.gameName}</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">({bg.participantName})</span>
+                      {isMine && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveBoardGame?.(item.id, bg.id)}
+                          className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 text-xs px-0.5"
+                          title="게임 취소"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                아직 등록된 게임이 없습니다. 어떤 보드게임을 가져오실지 아래에 적어주세요!
+              </p>
+            )}
+
+            {/* Quick Inline Board Game Addition */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!inputGameName.trim()) return;
+                triggerCelebration();
+                onAddBoardGame?.(item.id, inputGameName.trim(), currentParticipant.id, currentParticipant.name);
+                setInputGameName('');
+              }}
+              className="flex items-center gap-1.5 pt-1"
+            >
+              <input
+                type="text"
+                value={inputGameName}
+                onChange={(e) => setInputGameName(e.target.value)}
+                placeholder="가져올 게임 이름 (예: 스플렌더, 루미큐브)"
+                className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+              />
+              <button
+                type="submit"
+                disabled={!inputGameName.trim()}
+                className="px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white shadow-xs transition-all active:scale-95 flex-shrink-0"
+              >
+                + 게임 등록
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Footer info & tools */}
         <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">

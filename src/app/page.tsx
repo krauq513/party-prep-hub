@@ -282,6 +282,68 @@ export default function PartyPrepPage() {
     sendAction('clear_trash', {});
   };
 
+  const handleSaveBoardGame = (itemId: string, gameName: string, participantId: string, participantName: string) => {
+    const newBg = {
+      id: `bg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      gameName,
+      participantId,
+      participantName,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const currentGames = item.boardGames || [];
+        const nextGames = [...currentGames, newBg];
+
+        const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+        const exists = currentAssignees.some((a) => a.id === participantId);
+        const nextAssignees = exists
+          ? currentAssignees
+          : [...currentAssignees, { id: participantId, name: participantName }];
+
+        return {
+          ...item,
+          boardGames: nextGames,
+          assignees: nextAssignees,
+          assigneeId: nextAssignees[0]?.id,
+          assigneeName: nextAssignees[0]?.name,
+          isCompleted: true,
+        };
+      }),
+    }));
+
+    sendAction('add_board_game', { itemId, gameName, participantId, participantName });
+  };
+
+  const handleRemoveBoardGame = (itemId: string, gameId: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const currentGames = item.boardGames || [];
+        const nextGames = currentGames.filter((g) => g.id !== gameId);
+
+        const remainingParticipantIds = new Set(nextGames.map((g) => g.participantId));
+        const currentAssignees = item.assignees || [];
+        const nextAssignees = currentAssignees.filter((a) => remainingParticipantIds.has(a.id));
+
+        return {
+          ...item,
+          boardGames: nextGames,
+          assignees: nextAssignees,
+          assigneeId: nextAssignees[0]?.id,
+          assigneeName: nextAssignees[0]?.name,
+          isCompleted: nextGames.length > 0,
+        };
+      }),
+    }));
+
+    sendAction('remove_board_game', { itemId, gameId });
+  };
+
   const handleAddParticipant = (name: string, avatar: string) => {
     sendAction('add_participant', {
       name,
@@ -295,7 +357,9 @@ export default function PartyPrepPage() {
     if (item.type === 'personal') return (item.completedBy || []).includes(currentParticipant.id);
     if (item.type === 'shared_single') {
       const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
-      return assignees.some((a) => a.id === currentParticipant.id);
+      const inAssignees = assignees.some((a) => a.id === currentParticipant.id);
+      const inGames = (item.boardGames || []).some((bg) => bg.participantId === currentParticipant.id);
+      return inAssignees || inGames;
     }
     if (item.type === 'shared_quantity') return (item.contributions || []).some((c) => c.participantId === currentParticipant.id);
     return false;
@@ -305,7 +369,9 @@ export default function PartyPrepPage() {
     if (item.type === 'personal') return !(item.completedBy || []).includes(currentParticipant.id);
     if (item.type === 'shared_single') {
       const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
-      return assignees.length === 0 || !item.isCompleted;
+      const boardGames = item.boardGames || [];
+      const hasPledge = assignees.length > 0 || boardGames.length > 0;
+      return !hasPledge || !item.isCompleted;
     }
     if (item.type === 'shared_quantity') {
       const sum = (item.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
@@ -324,7 +390,8 @@ export default function PartyPrepPage() {
       const matchNotes = item.notes?.toLowerCase().includes(query);
       const matchAssignee = (item.assignees || []).some((a) => a.name.toLowerCase().includes(query)) || item.assigneeName?.toLowerCase().includes(query);
       const matchContrib = item.contributions?.some((c) => c.participantName.toLowerCase().includes(query));
-      if (!matchName && !matchCategory && !matchNotes && !matchAssignee && !matchContrib) {
+      const matchBoardGame = (item.boardGames || []).some((bg) => bg.gameName.toLowerCase().includes(query) || bg.participantName.toLowerCase().includes(query));
+      if (!matchName && !matchCategory && !matchNotes && !matchAssignee && !matchContrib && !matchBoardGame) {
         return false;
       }
     }
@@ -342,11 +409,13 @@ export default function PartyPrepPage() {
     // 4. Status Filter
     if (selectedStatus === 'my_items') {
       if (item.type === 'personal') {
-        return true;
+        return (item.completedBy || []).includes(currentParticipant.id);
       }
       if (item.type === 'shared_single') {
         const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
-        return assignees.some((a) => a.id === currentParticipant.id);
+        const inAssignees = assignees.some((a) => a.id === currentParticipant.id);
+        const inGames = (item.boardGames || []).some((bg) => bg.participantId === currentParticipant.id);
+        return inAssignees || inGames;
       }
       if (item.type === 'shared_quantity') {
         return item.contributions?.some((c) => c.participantId === currentParticipant.id);
@@ -359,7 +428,9 @@ export default function PartyPrepPage() {
       }
       if (item.type === 'shared_single') {
         const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
-        return assignees.length === 0 || !item.isCompleted;
+        const boardGames = item.boardGames || [];
+        const hasPledge = assignees.length > 0 || boardGames.length > 0;
+        return !hasPledge || !item.isCompleted;
       }
       if (item.type === 'shared_quantity') {
         const currentSum = (item.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
@@ -504,6 +575,8 @@ export default function PartyPrepPage() {
                           setIsAddModalOpen(true);
                         }}
                         onUpdateTargetQuantity={handleUpdateTargetQuantity}
+                        onAddBoardGame={handleSaveBoardGame}
+                        onRemoveBoardGame={handleRemoveBoardGame}
                       />
                     ))}
                   </div>
@@ -530,6 +603,8 @@ export default function PartyPrepPage() {
                   setIsAddModalOpen(true);
                 }}
                 onUpdateTargetQuantity={handleUpdateTargetQuantity}
+                onAddBoardGame={handleSaveBoardGame}
+                onRemoveBoardGame={handleRemoveBoardGame}
               />
             ))}
           </div>

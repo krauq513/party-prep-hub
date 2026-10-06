@@ -18,6 +18,15 @@ export interface QuantityContribution {
 export interface SingleAssignee {
   id: string;
   name: string;
+  note?: string;
+}
+
+export interface BoardGameItem {
+  id: string;
+  gameName: string;
+  participantId: string;
+  participantName: string;
+  createdAt: string;
 }
 
 export interface PartyItem {
@@ -34,6 +43,9 @@ export interface PartyItem {
   assigneeId?: string; // for backwards compatibility
   assigneeName?: string;
   isCompleted?: boolean;
+
+  // For board games: list of games brought by participants
+  boardGames?: BoardGameItem[];
   
   // For 'shared_quantity' items:
   targetQuantity?: number;

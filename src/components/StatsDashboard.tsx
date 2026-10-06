@@ -160,15 +160,15 @@ export default function StatsDashboard({
             <UserCheck className="w-4 h-4 text-slate-500" />
           </div>
           <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-              {personalRate}%
+            <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+              개인별 관리
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              ({donePersonalChecks}/{totalPersonalChecks}체크)
+              (비공개)
             </span>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-            수건, 세면도구, 여벌옷 등 각자 지참
+            수건, 세면도구 등 각자 본인만 확인
           </p>
         </div>
 

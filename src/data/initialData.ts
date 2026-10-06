@@ -81,7 +81,9 @@ export const INITIAL_PARTY_DATA: PartyData = {
       category: '오락/비상용품',
       type: 'shared_single',
       isCompleted: false,
-      notes: '할리갈리, 루미큐브, 뱅 등 챙겨올 사람 찜!',
+      assignees: [],
+      boardGames: [],
+      notes: '할리갈리, 루미큐브, 뱅 등 챙겨올 게임 이름을 적어주세요!',
       updatedAt: new Date().toISOString(),
     },
     {

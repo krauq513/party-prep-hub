@@ -39,11 +39,22 @@ export default function ReportModal({
 
   // 2. Contributions per participant
   const participantReports = participants.map((p) => {
-    const singleAssigned = items.filter((i) => {
-      if (i.type !== 'shared_single') return false;
-      const assignees = i.assignees || (i.assigneeId ? [{ id: i.assigneeId, name: i.assigneeName || '' }] : []);
-      return assignees.some((a) => a.id === p.id);
-    });
+    const singleAssigned = items
+      .filter((i) => {
+        if (i.type !== 'shared_single') return false;
+        const assignees = i.assignees || (i.assigneeId ? [{ id: itemAssigneeId(i), name: i.assigneeName || '' }] : []);
+        const hasAssignee = assignees.some((a) => a.id === p.id);
+        const hasBoardGame = (i.boardGames || []).some((bg) => bg.participantId === p.id);
+        return hasAssignee || hasBoardGame;
+      })
+      .map((i) => {
+        const myGames = (i.boardGames || []).filter((bg) => bg.participantId === p.id).map((bg) => bg.gameName);
+        if (myGames.length > 0) {
+          return `${i.name} [${myGames.join(', ')}]`;
+        }
+        return i.name;
+      });
+
     const quantityContribs = items
       .filter((i) => i.type === 'shared_quantity')
       .map((i) => {
@@ -52,17 +63,17 @@ export default function ReportModal({
       })
       .filter(Boolean) as string[];
 
-    const personalPacked = items.filter((i) => i.type === 'personal' && i.completedBy?.includes(p.id)).length;
-    const totalPersonal = items.filter((i) => i.type === 'personal').length;
-
     return {
       name: p.name,
       avatar: p.avatar,
-      singleAssigned: singleAssigned.map((i) => i.name),
+      singleAssigned,
       quantityContribs,
-      personalProgress: `${personalPacked}/${totalPersonal}`,
     };
   });
+
+  function itemAssigneeId(i: PartyItem) {
+    return i.assigneeId || '';
+  }
 
   // Calculate overall completion percent
   const personalItems = items.filter((i) => i.type === 'personal');
@@ -71,7 +82,7 @@ export default function ReportModal({
   const personalRate = personalTotal > 0 ? (personalDoneSum / personalTotal) : 1;
 
   const sharedSingleItems = items.filter((i) => i.type === 'shared_single');
-  const sharedSingleDone = sharedSingleItems.filter((i) => i.isCompleted).length;
+  const sharedSingleDone = sharedSingleItems.filter((i) => i.isCompleted || (i.boardGames && i.boardGames.length > 0)).length;
   const singleRate = sharedSingleItems.length > 0 ? (sharedSingleDone / sharedSingleItems.length) : 1;
 
   const sharedQuantityItems = items.filter((i) => i.type === 'shared_quantity');
@@ -108,16 +119,17 @@ export default function ReportModal({
     // Participants contribution section
     text += `👥 [참가자별 준비/기여 현황]\n`;
     participantReports.forEach((pr) => {
-      text += `${pr.avatar} ${pr.name} (개인준비 ${pr.personalProgress}):\n`;
+      text += `${pr.avatar} ${pr.name}:\n`;
       const allContribs = [...pr.singleAssigned, ...pr.quantityContribs];
       if (allContribs.length > 0) {
-        text += `  - ${allContribs.join(', ')}\n`;
+        text += `  • ${allContribs.join(', ')}\n`;
       } else {
-        text += `  - 아직 맡은 공용 물품 없음\n`;
+        text += `  • 아직 맡은 공용 물품 없음\n`;
       }
     });
 
-    text += `\n🔗 실시간 웹사이트에서 확인 및 추가 체크하기!`;
+    text += `\n💡 개인 지참 필수품(수건, 세면도구, 여벌옷 등)은 각자 사이트에서 체크해주세요!\n`;
+    text += `🔗 실시간 웹사이트: https://party-prep-hub.vercel.app`;
     return text;
   };
 

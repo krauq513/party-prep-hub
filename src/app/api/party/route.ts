@@ -82,6 +82,63 @@ export async function POST(req: Request) {
         break;
       }
 
+      case 'add_board_game': {
+        const { itemId, gameName, participantId, participantName } = payload;
+        updatedData.items = updatedData.items.map((item) => {
+          if (item.id !== itemId) return item;
+          const currentGames = item.boardGames || [];
+          const newGame = {
+            id: `bg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            gameName: (gameName || '').trim(),
+            participantId,
+            participantName,
+            createdAt: new Date().toISOString(),
+          };
+          const nextGames = [...currentGames, newGame];
+
+          const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+          const hasAssignee = currentAssignees.some((a) => a.id === participantId);
+          const nextAssignees = hasAssignee
+            ? currentAssignees
+            : [...currentAssignees, { id: participantId, name: participantName }];
+
+          return {
+            ...item,
+            boardGames: nextGames,
+            assignees: nextAssignees,
+            assigneeId: nextAssignees[0]?.id,
+            assigneeName: nextAssignees[0]?.name,
+            isCompleted: true,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        break;
+      }
+
+      case 'remove_board_game': {
+        const { itemId, gameId } = payload;
+        updatedData.items = updatedData.items.map((item) => {
+          if (item.id !== itemId) return item;
+          const currentGames = item.boardGames || [];
+          const nextGames = currentGames.filter((g) => g.id !== gameId);
+
+          const remainingParticipantIds = new Set(nextGames.map((g) => g.participantId));
+          const currentAssignees = item.assignees || [];
+          const nextAssignees = currentAssignees.filter((a) => remainingParticipantIds.has(a.id));
+
+          return {
+            ...item,
+            boardGames: nextGames,
+            assignees: nextAssignees,
+            assigneeId: nextAssignees[0]?.id,
+            assigneeName: nextAssignees[0]?.name,
+            isCompleted: nextGames.length > 0,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        break;
+      }
+
       case 'update_quantity_contribution': {
         const { itemId, participantId, participantName, quantity, note } = payload;
         updatedData.items = updatedData.items.map((item) => {
@@ -191,7 +248,7 @@ export async function POST(req: Request) {
           if (p.id !== id) return p;
           return { ...p, ...updates };
         });
-        // Also update names in assignees or contributions
+        // Also update names in assignees, boardGames, or contributions
         if (updates.name) {
           updatedData.items = updatedData.items.map((item) => {
             let itemUpdated = false;
@@ -200,6 +257,20 @@ export async function POST(req: Request) {
               assigneeName = updates.name;
               itemUpdated = true;
             }
+            const assignees = item.assignees?.map((a) => {
+              if (a.id === id) {
+                itemUpdated = true;
+                return { ...a, name: updates.name };
+              }
+              return a;
+            });
+            const boardGames = item.boardGames?.map((bg) => {
+              if (bg.participantId === id) {
+                itemUpdated = true;
+                return { ...bg, participantName: updates.name };
+              }
+              return bg;
+            });
             const contributions = item.contributions?.map((c) => {
               if (c.participantId === id) {
                 itemUpdated = true;
@@ -208,7 +279,7 @@ export async function POST(req: Request) {
               return c;
             });
             if (itemUpdated) {
-              return { ...item, assigneeName, contributions };
+              return { ...item, assigneeName, assignees, boardGames, contributions };
             }
             return item;
           });
