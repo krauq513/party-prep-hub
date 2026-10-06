@@ -45,7 +45,7 @@ export default function Header({
   const kMapUrl = kakaoMapUrl || 'https://kko.to/WSFJZnEqpn';
 
   return (
-    <header className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
+    <header className="relative bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-slate-800 transition-colors">
       <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           

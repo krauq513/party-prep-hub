@@ -476,7 +476,7 @@ export default function PartyPrepPage() {
       />
 
       {/* Main Container */}
-      <main className="max-w-6xl mx-auto px-3.5 py-4 sm:px-6 sm:py-6">
+      <main className="max-w-6xl mx-auto px-2.5 py-3 sm:px-6 sm:py-6">
         
         {/* Overall Stats Dashboard */}
         <StatsDashboard
@@ -558,7 +558,7 @@ export default function PartyPrepPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4">
                     {categoryItems.map((item) => (
                       <ItemCard
                         key={item.id}
@@ -586,7 +586,7 @@ export default function PartyPrepPage() {
           </div>
         ) : (
           // Flat List for filtered or searched view
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             {filteredItems.map((item) => (
               <ItemCard
                 key={item.id}
