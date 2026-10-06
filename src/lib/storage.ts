@@ -31,6 +31,10 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'r
     try {
       const data = await redis.get<PartyData>(REDIS_KEY);
       if (data) {
+        if (!data.location || data.location === '파티 플레이스' || data.location === '파티플레이스') {
+          data.location = '다큐하우스 펜션';
+          await redis.set(REDIS_KEY, data);
+        }
         return { data, storageType: 'redis' };
       }
       // If redis is empty, seed it with INITIAL_PARTY_DATA
@@ -46,6 +50,9 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'r
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, 'utf-8');
       const data = JSON.parse(raw);
+      if (!data.location || data.location === '파티 플레이스' || data.location === '파티플레이스') {
+        data.location = '다큐하우스 펜션';
+      }
       return { data, storageType: 'local_file' };
     }
   } catch (err) {
@@ -54,6 +61,9 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'r
 
   // 3. In-memory fallback
   if (globalForParty.partyData) {
+    if (!globalForParty.partyData.location || globalForParty.partyData.location === '파티 플레이스' || globalForParty.partyData.location === '파티플레이스') {
+      globalForParty.partyData.location = '다큐하우스 펜션';
+    }
     return { data: globalForParty.partyData, storageType: 'in_memory' };
   }
 

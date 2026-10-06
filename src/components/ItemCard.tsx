@@ -271,7 +271,7 @@ export default function ItemCard({
                 className="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm active:scale-95 transition-all min-h-[44px] flex items-center gap-1"
               >
                 <span>🙋</span>
-                <span>{isBoardGame ? '🎲 게임 챙기기' : hasAnyPledge ? '나도 찜하기!' : '내가 찜하기!'}</span>
+                <span>내가 찜하기!</span>
               </button>
             )}
           </div>
@@ -536,7 +536,7 @@ export default function ItemCard({
           }`}
         >
           <ShoppingBag className="w-3.5 h-3.5" />
-          <span>{myContrib ? '찜 수량 수정' : '이거 찜하기!'}</span>
+          <span>{myContrib ? '찜 수량 수정' : '내가 찜하기!'}</span>
         </button>
       </div>
 

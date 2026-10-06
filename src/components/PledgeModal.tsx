@@ -240,7 +240,7 @@ export default function PledgeModal({
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-base shadow-lg shadow-orange-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 min-h-[48px]"
             >
               <span>🛒</span>
-              <span>{quantity.toLocaleString()}{unit} 가져갈게요! 찜하기</span>
+              <span>{quantity.toLocaleString()}{unit} 내가 찜하기!</span>
             </button>
 
             {myContrib && (
