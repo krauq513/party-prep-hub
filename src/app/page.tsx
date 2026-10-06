@@ -13,6 +13,7 @@ import ReportModal from '@/components/ReportModal';
 import PledgeModal from '@/components/PledgeModal';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import WelcomeSelectModal from '@/components/WelcomeSelectModal';
+import TrashModal from '@/components/TrashModal';
 import { Plus } from 'lucide-react';
 
 const LOCAL_STORAGE_USER_KEY = 'party_current_participant_id_v2';
@@ -33,6 +34,7 @@ export default function PartyPrepPage() {
   const [editItem, setEditItem] = useState<PartyItem | null>(null);
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
 
   // 웰컴 (첫 접속자 이름 선택) Modal
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
@@ -251,11 +253,33 @@ export default function PartyPrepPage() {
   };
 
   const handleDeleteItem = (itemId: string) => {
+    const itemToDelete = partyData.items.find((i) => i.id === itemId);
+    if (!itemToDelete) return;
     setPartyData((prev) => ({
       ...prev,
       items: prev.items.filter((i) => i.id !== itemId),
+      deletedItems: [itemToDelete, ...(prev.deletedItems || [])],
     }));
     sendAction('delete_item', { itemId });
+  };
+
+  const handleRestoreItem = (itemId: string) => {
+    const itemToRestore = (partyData.deletedItems || []).find((i) => i.id === itemId);
+    if (!itemToRestore) return;
+    setPartyData((prev) => ({
+      ...prev,
+      deletedItems: (prev.deletedItems || []).filter((i) => i.id !== itemId),
+      items: [itemToRestore, ...prev.items],
+    }));
+    sendAction('restore_item', { itemId });
+  };
+
+  const handleClearTrash = () => {
+    setPartyData((prev) => ({
+      ...prev,
+      deletedItems: [],
+    }));
+    sendAction('clear_trash', {});
   };
 
   const handleAddParticipant = (name: string, avatar: string) => {
@@ -365,6 +389,8 @@ export default function PartyPrepPage() {
         title={partyData.title}
         eventDate={partyData.eventDate}
         location={partyData.location}
+        naverMapUrl={partyData.naverMapUrl}
+        kakaoMapUrl={partyData.kakaoMapUrl}
         participants={partyData.participants}
         currentParticipant={currentParticipant}
         onSelectParticipant={handleSelectParticipant}
@@ -509,6 +535,27 @@ export default function PartyPrepPage() {
           </div>
         )}
 
+        {/* 하단 복구용 휴지통 영역 */}
+        <div className="mt-12 pt-6 border-t border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2">
+            <span>실수로 준비물을 삭제하셨나요?</span>
+            <button
+              onClick={() => setIsTrashModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-200/70 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 font-bold text-slate-700 dark:text-slate-300 transition-colors shadow-sm active:scale-95"
+            >
+              <span>🗑️ 휴지통</span>
+              {(partyData.deletedItems || []).length > 0 && (
+                <span className="px-1.5 py-0.5 bg-rose-500 text-white rounded-full text-[10px] font-black">
+                  {(partyData.deletedItems || []).length}
+                </span>
+              )}
+            </button>
+          </div>
+          <div className="font-medium text-slate-400 dark:text-slate-500 text-[11px]">
+            언제든 휴지통에서 삭제한 항목을 원래대로 복구할 수 있습니다
+          </div>
+        </div>
+
       </main>
 
       {/* Floating Add Button for Desktop */}
@@ -587,6 +634,15 @@ export default function PartyPrepPage() {
         eventDate={partyData.eventDate}
         items={partyData.items}
         participants={partyData.participants}
+      />
+
+      {/* 휴지통 (삭제 항목 복구) Modal */}
+      <TrashModal
+        isOpen={isTrashModalOpen}
+        onClose={() => setIsTrashModalOpen(false)}
+        deletedItems={partyData.deletedItems || []}
+        onRestoreItem={handleRestoreItem}
+        onClearTrash={handleClearTrash}
       />
 
     </div>

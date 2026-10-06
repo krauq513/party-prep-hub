@@ -48,8 +48,11 @@ export interface PartyData {
   title: string;
   eventDate?: string;
   location?: string;
+  naverMapUrl?: string;
+  kakaoMapUrl?: string;
   participants: Participant[];
   items: PartyItem[];
+  deletedItems?: PartyItem[];
   updatedAt: string;
 }
 

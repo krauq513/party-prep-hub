@@ -7,12 +7,15 @@ import {
   Share2, 
   Plus, 
   RotateCw, 
+  ExternalLink,
 } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
   eventDate?: string;
   location?: string;
+  naverMapUrl?: string;
+  kakaoMapUrl?: string;
   participants: Participant[];
   currentParticipant: Participant;
   onSelectParticipant: (participant: Participant) => void;
@@ -27,6 +30,8 @@ export default function Header({
   title,
   eventDate,
   location,
+  naverMapUrl,
+  kakaoMapUrl,
   participants,
   currentParticipant,
   onSelectParticipant,
@@ -36,14 +41,17 @@ export default function Header({
   onRefresh,
   isLoading,
 }: HeaderProps) {
+  const nMapUrl = naverMapUrl || 'https://naver.me/xQe2uhho';
+  const kMapUrl = kakaoMapUrl || 'https://kko.to/WSFJZnEqpn';
+
   return (
     <header className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
       <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           
           {/* Title & Metadata */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-md shadow-rose-500/20 text-xl font-bold flex-shrink-0">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-md shadow-rose-500/20 text-xl font-bold flex-shrink-0 mt-0.5 sm:mt-0">
               🎉
             </div>
             <div>
@@ -52,10 +60,37 @@ export default function Header({
                   {title}
                 </h1>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
                 {eventDate && <span>📅 {eventDate}</span>}
                 {location && <span>• 📍 {location}</span>}
-                <span>• 👥 총 {participants.length}명 참여 중</span>
+                <span>• 👥 총 {participants.length}명</span>
+              </div>
+              
+              {/* Map Quick Links */}
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">📍 길찾기:</span>
+                <a
+                  href={nMapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#03C75A]/10 hover:bg-[#03C75A]/20 text-[#03C75A] border border-[#03C75A]/30 transition-colors active:scale-95 shadow-2xs"
+                  title="네이버 지도로 열기"
+                >
+                  <span className="text-[10px]">🟢</span>
+                  <span>네이버지도</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                <a
+                  href={kMapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FEE500]/25 hover:bg-[#FEE500]/40 text-[#3C1E1E] dark:text-[#FEE500] border border-[#FEE500]/40 transition-colors active:scale-95 shadow-2xs"
+                  title="카카오맵으로 열기"
+                >
+                  <span className="text-[10px]">🟡</span>
+                  <span>카카오맵</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
             </div>
           </div>

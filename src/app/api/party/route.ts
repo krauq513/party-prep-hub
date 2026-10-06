@@ -145,7 +145,34 @@ export async function POST(req: Request) {
 
       case 'delete_item': {
         const { itemId } = payload;
-        updatedData.items = updatedData.items.filter((item) => item.id !== itemId);
+        const itemToDelete = updatedData.items.find((item) => item.id === itemId);
+        if (itemToDelete) {
+          updatedData.items = updatedData.items.filter((item) => item.id !== itemId);
+          const currentDeleted = updatedData.deletedItems || [];
+          updatedData.deletedItems = [
+            { ...itemToDelete, updatedAt: new Date().toISOString() },
+            ...currentDeleted,
+          ];
+        }
+        break;
+      }
+
+      case 'restore_item': {
+        const { itemId } = payload;
+        const currentDeleted = updatedData.deletedItems || [];
+        const itemToRestore = currentDeleted.find((item) => item.id === itemId);
+        if (itemToRestore) {
+          updatedData.deletedItems = currentDeleted.filter((item) => item.id !== itemId);
+          updatedData.items = [
+            { ...itemToRestore, updatedAt: new Date().toISOString() },
+            ...updatedData.items,
+          ];
+        }
+        break;
+      }
+
+      case 'clear_trash': {
+        updatedData.deletedItems = [];
         break;
       }
 

@@ -21,7 +21,10 @@ export const INITIAL_PARTY_DATA: PartyData = {
   title: '🔥 파티 준비물 체크 허브',
   eventDate: '2026. 10. 24(토) ~ 10. 25(일)',
   location: '파티 플레이스',
+  naverMapUrl: 'https://naver.me/xQe2uhho',
+  kakaoMapUrl: 'https://kko.to/WSFJZnEqpn',
   participants: INITIAL_PARTICIPANTS,
+  deletedItems: [],
   updatedAt: new Date().toISOString(),
   items: [
     // 🎒 개인 필수 준비물 (디폴트: 아무도 안 챙김)
