@@ -41,6 +41,7 @@ export async function POST(req: Request) {
           return {
             ...item,
             completedBy: newList,
+            isCompleted: newList.length > 0,
             updatedAt: new Date().toISOString(),
           };
         });
@@ -57,12 +58,17 @@ export async function POST(req: Request) {
             ? currentAssignees.filter((a) => a.id !== participantId)
             : [...currentAssignees, { id: participantId, name: participantName }];
 
+          const newCompletedBy = exists
+            ? (item.completedBy || []).filter((id) => id !== participantId)
+            : (item.completedBy || []);
+
           return {
             ...item,
             assignees: newAssignees,
             assigneeId: newAssignees.length > 0 ? newAssignees[0].id : undefined,
             assigneeName: newAssignees.length > 0 ? newAssignees[0].name : undefined,
-            isCompleted: newAssignees.length > 0 ? item.isCompleted : false,
+            completedBy: newCompletedBy,
+            isCompleted: newCompletedBy.length > 0,
             updatedAt: new Date().toISOString(),
           };
         });

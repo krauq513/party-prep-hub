@@ -21,7 +21,7 @@ interface ItemCardProps {
   currentParticipant: Participant;
   onTogglePersonal: (itemId: string, participantId: string) => void;
   onClaimSharedSingle: (itemId: string, participantId: string, participantName: string) => void;
-  onToggleSharedComplete: (itemId: string) => void;
+  onToggleSharedComplete?: (itemId: string) => void;
   onOpenPledgeModal: (item: PartyItem) => void;
   onDeleteItem: (itemId: string) => void;
   onEditItem: (item: PartyItem) => void;
@@ -35,7 +35,6 @@ export default function ItemCard({
   currentParticipant,
   onTogglePersonal,
   onClaimSharedSingle,
-  onToggleSharedComplete,
   onOpenPledgeModal,
   onDeleteItem,
   onEditItem,
@@ -166,10 +165,12 @@ export default function ItemCard({
   if (item.type === 'shared_single') {
     const isBoardGame = item.name.includes('보드게임') || (item.boardGames && item.boardGames.length > 0);
     const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
-    const isPledgedByMe = assignees.some((a) => a.id === currentParticipant.id);
     const boardGamesList = item.boardGames || [];
+    const inGames = boardGamesList.some((bg) => bg.participantId === currentParticipant.id);
+    const isPledgedByMe = assignees.some((a) => a.id === currentParticipant.id) || inGames;
+    const isPackedByMe = (item.completedBy || []).includes(currentParticipant.id);
     const hasAnyPledge = assignees.length > 0 || boardGamesList.length > 0;
-    const isDone = item.isCompleted || boardGamesList.length > 0;
+    const isDone = isPackedByMe || (item.completedBy && item.completedBy.length > 0) || item.isCompleted;
 
     const handleClaimClick = () => {
       if (isBoardGame) {
@@ -186,8 +187,10 @@ export default function ItemCard({
 
     return (
       <div className={`p-3 sm:p-4 rounded-2xl border transition-all flex flex-col justify-between h-full ${
-        isDone
-          ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60 shadow-xs'
+        isPackedByMe
+          ? 'bg-emerald-50/50 dark:bg-emerald-950/25 border-emerald-300 dark:border-emerald-800 shadow-xs'
+          : isDone
+          ? 'bg-emerald-50/30 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60 shadow-xs'
           : isPledgedByMe
           ? 'bg-indigo-50/40 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800 shadow-xs'
           : hasAnyPledge
@@ -209,9 +212,13 @@ export default function ItemCard({
                 <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-0.5">
                   <AlertCircle className="w-2.5 h-2.5" /> 미찜
                 </span>
-              ) : isDone ? (
+              ) : isPackedByMe ? (
                 <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-0.5">
-                  <Check className="w-2.5 h-2.5" /> 완료!
+                  <Check className="w-2.5 h-2.5" /> 챙김 완료!
+                </span>
+              ) : (item.completedBy && item.completedBy.length > 0) ? (
+                <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-0.5">
+                  <Check className="w-2.5 h-2.5" /> 챙김 완료
                 </span>
               ) : (
                 <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
@@ -222,6 +229,7 @@ export default function ItemCard({
 
             <div className="flex items-center gap-0.5">
               <button
+                type="button"
                 onClick={() => onEditItem(item)}
                 className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg"
                 title="수정"
@@ -230,6 +238,7 @@ export default function ItemCard({
                 <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
               <button
+                type="button"
                 onClick={() => {
                   if (confirm(`'${item.name}' 항목을 삭제하시겠습니까?`)) {
                     onDeleteItem(item.id);
@@ -260,16 +269,24 @@ export default function ItemCard({
           <div className="mt-2 flex items-center gap-1 flex-wrap text-[11px]">
             <span className="text-slate-400 text-[10px]">찜:</span>
             {assignees.length > 0 ? (
-              assignees.map((a) => (
-                <span
-                  key={a.id}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px]"
-                >
-                  <User className="w-2.5 h-2.5" />
-                  <span className="truncate max-w-[50px]">{a.name}</span>
-                  {a.id === currentParticipant.id && <span className="text-[8px] bg-indigo-200 dark:bg-indigo-800 px-0.5 rounded">나</span>}
-                </span>
-              ))
+              assignees.map((a) => {
+                const aPacked = (item.completedBy || []).includes(a.id);
+                return (
+                  <span
+                    key={a.id}
+                    className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full font-bold border text-[10px] ${
+                      aPacked
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                        : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                    }`}
+                  >
+                    <User className="w-2.5 h-2.5" />
+                    <span className="truncate max-w-[50px]">{a.name}</span>
+                    {aPacked && <span className="text-[8px] bg-emerald-200 dark:bg-emerald-800 px-0.5 rounded">챙김</span>}
+                    {a.id === currentParticipant.id && <span className="text-[8px] bg-indigo-200 dark:bg-indigo-800 px-0.5 rounded">나</span>}
+                  </span>
+                );
+              })
             ) : (
               <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
                 아직 아무도 찜 안 함
@@ -348,34 +365,55 @@ export default function ItemCard({
           )}
         </div>
 
-        {/* Bottom Area: Action Buttons */}
+        {/* Bottom Area: Action Buttons (찜하기 후 챙김 버튼 별개 표시) */}
         <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/70 space-y-1.5">
           {isPledgedByMe ? (
-            <div className="flex items-center gap-1">
+            <div className="space-y-1.5">
+              {/* 1. 찜 상태 및 찜 취소 */}
+              <div className="flex items-center justify-between text-[11px] px-0.5">
+                <span className="text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1">
+                  <span>🙋</span>
+                  <span>내가 찜함</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name)}
+                  className="text-slate-400 hover:text-rose-500 underline text-[10px]"
+                  title="내 찜 취소"
+                >
+                  찜 취소
+                </button>
+              </div>
+
+              {/* 2. 별개로 나타나는 챙김 버튼 */}
               <button
+                type="button"
                 onClick={() => {
-                  if (!isDone) triggerCelebration();
-                  onToggleSharedComplete(item.id);
+                  if (!isPackedByMe) triggerCelebration();
+                  onTogglePersonal(item.id, currentParticipant.id);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs sm:text-sm font-bold border transition-all min-h-[40px] active:scale-95 ${
-                  isDone
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white border-slate-300 dark:border-slate-600'
+                className={`w-full flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all min-h-[40px] active:scale-95 ${
+                  isPackedByMe
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs shadow-emerald-600/30'
+                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
                 }`}
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{isDone ? '완료됨' : '완료 체크'}</span>
-              </button>
-              <button
-                onClick={() => onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name)}
-                className="px-2 py-2 text-[11px] text-slate-400 hover:text-rose-500 min-h-[40px] flex-shrink-0"
-                title="내 찜 취소"
-              >
-                취소
+                {isPackedByMe ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                    <span>챙김 완료!</span>
+                  </>
+                ) : (
+                  <>
+                    <Circle className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>나 챙겼어요</span>
+                  </>
+                )}
               </button>
             </div>
           ) : (
             <button
+              type="button"
               onClick={handleClaimClick}
               className="w-full flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs active:scale-95 transition-all min-h-[40px]"
             >
@@ -396,12 +434,15 @@ export default function ItemCard({
   const contributions = item.contributions || [];
   const currentTotal = contributions.reduce((acc, c) => acc + c.quantity, 0);
   const myContrib = contributions.find((c) => c.participantId === currentParticipant.id);
+  const isPackedByMe = (item.completedBy || []).includes(currentParticipant.id);
   const isFulfilled = currentTotal >= target;
   const percent = Math.min(Math.round((currentTotal / target) * 100), 100);
 
   return (
     <div className={`p-3 sm:p-4 rounded-2xl border transition-all flex flex-col justify-between h-full ${
-      isFulfilled
+      isPackedByMe
+        ? 'bg-emerald-50/50 dark:bg-emerald-950/25 border-emerald-300 dark:border-emerald-800 shadow-xs'
+        : isFulfilled
         ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60 shadow-xs'
         : myContrib
         ? 'bg-indigo-50/30 dark:bg-indigo-950/20 border-indigo-200/80 dark:border-indigo-900/60 shadow-xs'
@@ -414,7 +455,11 @@ export default function ItemCard({
             <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
               수량
             </span>
-            {isFulfilled ? (
+            {isPackedByMe ? (
+              <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-0.5">
+                <Check className="w-2.5 h-2.5" /> 내 찜 챙김!
+              </span>
+            ) : isFulfilled ? (
               <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-0.5">
                 <Check className="w-2.5 h-2.5" /> 달성!
               </span>
@@ -427,6 +472,7 @@ export default function ItemCard({
 
           <div className="flex items-center gap-0.5">
             <button
+              type="button"
               onClick={() => onEditItem(item)}
               className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg"
               title="수정"
@@ -435,6 +481,7 @@ export default function ItemCard({
               <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </button>
             <button
+              type="button"
               onClick={() => {
                 if (confirm(`'${item.name}' 항목을 삭제하시겠습니까?`)) {
                   onDeleteItem(item.id);
@@ -478,6 +525,7 @@ export default function ItemCard({
           {onUpdateTargetQuantity && (
             <div className="flex items-center gap-1">
               <button
+                type="button"
                 onClick={() => onUpdateTargetQuantity(item.id, Math.max(1, target - (unit === 'g' ? 500 : 1)))}
                 className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center justify-center active:scale-95"
                 title="목표 수량 감소"
@@ -485,6 +533,7 @@ export default function ItemCard({
                 -
               </button>
               <button
+                type="button"
                 onClick={() => onUpdateTargetQuantity(item.id, target + (unit === 'g' ? 500 : 1))}
                 className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center justify-center active:scale-95"
                 title="목표 수량 증가"
@@ -518,43 +567,91 @@ export default function ItemCard({
               아직 찜 없음
             </span>
           ) : (
-            contributions.map((c) => (
-              <span
-                key={c.participantId}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium"
-              >
-                <span className="truncate max-w-[45px]">👤 {c.participantName}:</span>
-                <span className="font-bold text-indigo-600 dark:text-indigo-400">{c.quantity}{unit}</span>
-              </span>
-            ))
+            contributions.map((c) => {
+              const cPacked = (item.completedBy || []).includes(c.participantId);
+              return (
+                <span
+                  key={c.participantId}
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border font-medium ${
+                    cPacked
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <span className="truncate max-w-[45px]">👤 {c.participantName}:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{c.quantity}{unit}</span>
+                  {cPacked && <span className="text-[8px] bg-emerald-200 dark:bg-emerald-800 px-0.5 rounded font-bold text-emerald-800 dark:text-emerald-200">챙김</span>}
+                </span>
+              );
+            })
           )}
         </div>
       </div>
 
-      {/* Main 찜하기 Action Bar */}
+      {/* Main Action Bar (찜하기 후 챙김 버튼 별개 표시) */}
       <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/70 space-y-1.5">
-        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 font-medium truncate max-w-[110px]">
-            {myContrib ? `📌 내 찜: ${myContrib.quantity}${unit}` : '아직 찜하지 않음'}
-          </span>
-          {isFulfilled && (
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-              달성 ✨
-            </span>
-          )}
-        </div>
+        {myContrib ? (
+          <div className="space-y-1.5">
+            {/* 1. 찜 내역 & 수정 옵션 */}
+            <div className="flex items-center justify-between text-[11px] px-0.5">
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold truncate max-w-[105px]">
+                📌 내 찜: {myContrib.quantity}{unit}
+              </span>
+              <button
+                type="button"
+                onClick={() => onOpenPledgeModal(item)}
+                className="text-indigo-600 dark:text-indigo-400 hover:underline text-[10px] font-semibold flex-shrink-0"
+              >
+                수량 수정
+              </button>
+            </div>
 
-        <button
-          onClick={() => onOpenPledgeModal(item)}
-          className={`w-full flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs sm:text-sm font-bold min-h-[40px] active:scale-95 transition-all shadow-xs ${
-            myContrib
-              ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
-              : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/20'
-          }`}
-        >
-          <ShoppingBag className="w-3.5 h-3.5" />
-          <span>{myContrib ? '찜 수량 수정' : '내가 찜하기!'}</span>
-        </button>
+            {/* 2. 별개로 나타나는 챙김 버튼 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPackedByMe) triggerCelebration();
+                onTogglePersonal(item.id, currentParticipant.id);
+              }}
+              className={`w-full flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all min-h-[40px] active:scale-95 ${
+                isPackedByMe
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs shadow-emerald-600/30'
+                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
+              }`}
+            >
+              {isPackedByMe ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                  <span>챙김 완료!</span>
+                </>
+              ) : (
+                <>
+                  <Circle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>나 챙겼어요 ({myContrib.quantity}{unit})</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <div className="text-[11px] text-slate-400 flex items-center justify-between">
+              <span>아직 찜하지 않음</span>
+              {isFulfilled && (
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                  목표 달성 ✨
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenPledgeModal(item)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs sm:text-sm font-bold min-h-[40px] active:scale-95 transition-all shadow-xs bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/20"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>내가 찜하기!</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
