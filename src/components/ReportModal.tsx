@@ -26,7 +26,11 @@ export default function ReportModal({
   if (!isOpen) return null;
 
   // 1. Missing / Incomplete Items
-  const unassignedSingle = items.filter((i) => i.type === 'shared_single' && !i.assigneeId);
+  const unassignedSingle = items.filter((i) => {
+    if (i.type !== 'shared_single') return false;
+    const assignees = i.assignees || (i.assigneeId ? [{ id: i.assigneeId, name: i.assigneeName || '' }] : []);
+    return assignees.length === 0;
+  });
   const unmetQuantity = items.filter((i) => {
     if (i.type !== 'shared_quantity') return false;
     const current = (i.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
@@ -35,7 +39,11 @@ export default function ReportModal({
 
   // 2. Contributions per participant
   const participantReports = participants.map((p) => {
-    const singleAssigned = items.filter((i) => i.type === 'shared_single' && i.assigneeId === p.id);
+    const singleAssigned = items.filter((i) => {
+      if (i.type !== 'shared_single') return false;
+      const assignees = i.assignees || (i.assigneeId ? [{ id: i.assigneeId, name: i.assigneeName || '' }] : []);
+      return assignees.some((a) => a.id === p.id);
+    });
     const quantityContribs = items
       .filter((i) => i.type === 'shared_quantity')
       .map((i) => {

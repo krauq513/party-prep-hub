@@ -7,7 +7,6 @@ import {
   Share2, 
   Plus, 
   RotateCw, 
-  Database, 
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -20,10 +19,8 @@ interface HeaderProps {
   onOpenAddModal: () => void;
   onOpenReportModal: () => void;
   onOpenParticipantModal: () => void;
-  onOpenStorageModal: () => void;
   onRefresh: () => void;
   isLoading: boolean;
-  storageType: 'redis' | 'local_file' | 'in_memory';
 }
 
 export default function Header({
@@ -36,10 +33,8 @@ export default function Header({
   onOpenAddModal,
   onOpenReportModal,
   onOpenParticipantModal,
-  onOpenStorageModal,
   onRefresh,
   isLoading,
-  storageType,
 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
@@ -56,19 +51,6 @@ export default function Header({
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                   {title}
                 </h1>
-                <button
-                  onClick={onOpenStorageModal}
-                  aria-label="스토리지 상태 및 Vercel 연동 가이드"
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
-                    storageType === 'redis'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                      : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 hover:bg-amber-100'
-                  }`}
-                  title={storageType === 'redis' ? 'Vercel KV 실시간 동기화 연결됨' : '클릭하여 실시간 클라우드 DB 연동 확인'}
-                >
-                  <Database className="w-3 h-3" />
-                  <span>{storageType === 'redis' ? 'Vercel KV 동기화' : '로컬/데모 모드'}</span>
-                </button>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {eventDate && <span>📅 {eventDate}</span>}

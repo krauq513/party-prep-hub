@@ -19,7 +19,7 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
 
 export const INITIAL_PARTY_DATA: PartyData = {
   title: '🔥 파티 준비물 체크 허브',
-  eventDate: '2026-10-10',
+  eventDate: '2026. 10. 24(토) ~ 10. 25(일)',
   location: '파티 플레이스',
   participants: INITIAL_PARTICIPANTS,
   updatedAt: new Date().toISOString(),

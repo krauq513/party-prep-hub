@@ -15,6 +15,11 @@ export interface QuantityContribution {
   note?: string;
 }
 
+export interface SingleAssignee {
+  id: string;
+  name: string;
+}
+
 export interface PartyItem {
   id: string;
   name: string;
@@ -24,8 +29,9 @@ export interface PartyItem {
   // For 'personal' items: list of participant IDs who packed this item for themselves
   completedBy?: string[];
   
-  // For 'shared_single' items:
-  assigneeId?: string;
+  // For 'shared_single' items: supports multiple people claiming/찜
+  assignees?: SingleAssignee[];
+  assigneeId?: string; // for backwards compatibility
   assigneeName?: string;
   isCompleted?: boolean;
   

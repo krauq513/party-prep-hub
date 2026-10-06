@@ -10,9 +10,9 @@ import ItemCard from '@/components/ItemCard';
 import AddItemModal from '@/components/AddItemModal';
 import ParticipantModal from '@/components/ParticipantModal';
 import ReportModal from '@/components/ReportModal';
-import VercelStorageGuideModal from '@/components/VercelStorageGuideModal';
 import PledgeModal from '@/components/PledgeModal';
 import MobileBottomNav from '@/components/MobileBottomNav';
+import WelcomeSelectModal from '@/components/WelcomeSelectModal';
 import { Plus } from 'lucide-react';
 
 const LOCAL_STORAGE_USER_KEY = 'party_current_participant_id_v2';
@@ -20,7 +20,6 @@ const LOCAL_STORAGE_USER_KEY = 'party_current_participant_id_v2';
 export default function PartyPrepPage() {
   const [partyData, setPartyData] = useState<PartyData>(INITIAL_PARTY_DATA);
   const [currentParticipant, setCurrentParticipant] = useState<Participant>(INITIAL_PARTICIPANTS[0]);
-  const [storageType, setStorageType] = useState<'redis' | 'local_file' | 'in_memory'>('in_memory');
   const [isLoading, setIsLoading] = useState(false);
 
   // Filters
@@ -34,7 +33,9 @@ export default function PartyPrepPage() {
   const [editItem, setEditItem] = useState<PartyItem | null>(null);
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+
+  // 웰컴 (첫 접속자 이름 선택) Modal
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
 
   // 찜하기 (Pledge) Modal
   const [isPledgeModalOpen, setIsPledgeModalOpen] = useState(false);
@@ -49,22 +50,28 @@ export default function PartyPrepPage() {
         const json = await res.json();
         if (json.data) {
           setPartyData(json.data);
-          if (json.storageType) {
-            setStorageType(json.storageType);
-          }
 
-          // Restore saved user or default to first
+          // Restore saved user or open welcome modal
           const savedUserId = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
           if (savedUserId) {
             const found = json.data.participants.find((p: Participant) => p.id === savedUserId);
-            if (found) setCurrentParticipant(found);
-          } else if (json.data.participants?.length > 0) {
-            setCurrentParticipant(json.data.participants[0]);
+            if (found) {
+              setCurrentParticipant(found);
+            } else {
+              setIsWelcomeModalOpen(true);
+            }
+          } else {
+            // First time visitor: show welcome modal
+            setIsWelcomeModalOpen(true);
           }
         }
       }
     } catch (err) {
       console.warn('Fetch party data failed, using initial state:', err);
+      const savedUserId = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+      if (!savedUserId) {
+        setIsWelcomeModalOpen(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -80,6 +87,11 @@ export default function PartyPrepPage() {
     localStorage.setItem(LOCAL_STORAGE_USER_KEY, p.id);
   };
 
+  const handleWelcomeSelect = (p: Participant) => {
+    handleSelectParticipant(p);
+    setIsWelcomeModalOpen(false);
+  };
+
   // Helper to send backend updates
   const sendAction = async (action: string, payload: unknown) => {
     try {
@@ -92,7 +104,6 @@ export default function PartyPrepPage() {
         const json = await res.json();
         if (json.data) {
           setPartyData(json.data);
-          if (json.storageType) setStorageType(json.storageType);
         }
       }
     } catch (err) {
@@ -124,19 +135,18 @@ export default function PartyPrepPage() {
       ...prev,
       items: prev.items.map((item) => {
         if (item.id !== itemId) return item;
-        if (item.assigneeId === participantId) {
-          return {
-            ...item,
-            assigneeId: undefined,
-            assigneeName: undefined,
-            isCompleted: false,
-          };
-        }
+        const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+        const exists = currentAssignees.some((a) => a.id === participantId);
+        const newAssignees = exists
+          ? currentAssignees.filter((a) => a.id !== participantId)
+          : [...currentAssignees, { id: participantId, name: participantName }];
+
         return {
           ...item,
-          assigneeId: participantId,
-          assigneeName: participantName,
-          isCompleted: false, // Default to in progress when pledged
+          assignees: newAssignees,
+          assigneeId: newAssignees.length > 0 ? newAssignees[0].id : undefined,
+          assigneeName: newAssignees.length > 0 ? newAssignees[0].name : undefined,
+          isCompleted: newAssignees.length > 0 ? item.isCompleted : false,
         };
       }),
     }));
@@ -256,34 +266,23 @@ export default function PartyPrepPage() {
     });
   };
 
-  const handleResetData = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/party', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset' }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) setPartyData(json.data);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // --- Counts for Badges ---
   const myPledgedCount = partyData.items.filter((item) => {
     if (item.type === 'personal') return (item.completedBy || []).includes(currentParticipant.id);
-    if (item.type === 'shared_single') return item.assigneeId === currentParticipant.id;
+    if (item.type === 'shared_single') {
+      const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+      return assignees.some((a) => a.id === currentParticipant.id);
+    }
     if (item.type === 'shared_quantity') return (item.contributions || []).some((c) => c.participantId === currentParticipant.id);
     return false;
   }).length;
 
   const incompleteCount = partyData.items.filter((item) => {
     if (item.type === 'personal') return !(item.completedBy || []).includes(currentParticipant.id);
-    if (item.type === 'shared_single') return !item.assigneeId || !item.isCompleted;
+    if (item.type === 'shared_single') {
+      const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+      return assignees.length === 0 || !item.isCompleted;
+    }
     if (item.type === 'shared_quantity') {
       const sum = (item.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
       return sum < (item.targetQuantity || 1);
@@ -299,7 +298,7 @@ export default function PartyPrepPage() {
       const matchName = item.name.toLowerCase().includes(query);
       const matchCategory = item.category.toLowerCase().includes(query);
       const matchNotes = item.notes?.toLowerCase().includes(query);
-      const matchAssignee = item.assigneeName?.toLowerCase().includes(query);
+      const matchAssignee = (item.assignees || []).some((a) => a.name.toLowerCase().includes(query)) || item.assigneeName?.toLowerCase().includes(query);
       const matchContrib = item.contributions?.some((c) => c.participantName.toLowerCase().includes(query));
       if (!matchName && !matchCategory && !matchNotes && !matchAssignee && !matchContrib) {
         return false;
@@ -322,7 +321,8 @@ export default function PartyPrepPage() {
         return true;
       }
       if (item.type === 'shared_single') {
-        return item.assigneeId === currentParticipant.id;
+        const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+        return assignees.some((a) => a.id === currentParticipant.id);
       }
       if (item.type === 'shared_quantity') {
         return item.contributions?.some((c) => c.participantId === currentParticipant.id);
@@ -334,7 +334,8 @@ export default function PartyPrepPage() {
         return !(item.completedBy || []).includes(currentParticipant.id);
       }
       if (item.type === 'shared_single') {
-        return !item.assigneeId || !item.isCompleted;
+        const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+        return assignees.length === 0 || !item.isCompleted;
       }
       if (item.type === 'shared_quantity') {
         const currentSum = (item.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
@@ -373,10 +374,8 @@ export default function PartyPrepPage() {
         }}
         onOpenReportModal={() => setIsReportModalOpen(true)}
         onOpenParticipantModal={() => setIsParticipantModalOpen(true)}
-        onOpenStorageModal={() => setIsStorageModalOpen(true)}
         onRefresh={fetchData}
         isLoading={isLoading}
-        storageType={storageType}
       />
 
       {/* Main Container */}
@@ -538,6 +537,13 @@ export default function PartyPrepPage() {
         incompleteCount={incompleteCount}
       />
 
+      {/* 웰컴 모달 (첫 방문자 본인 선택 & 캐시 등록) */}
+      <WelcomeSelectModal
+        isOpen={isWelcomeModalOpen}
+        participants={partyData.participants}
+        onSelect={handleWelcomeSelect}
+      />
+
       {/* 찜하기 (Pledge) Modal */}
       <PledgeModal
         isOpen={isPledgeModalOpen}
@@ -581,14 +587,6 @@ export default function PartyPrepPage() {
         eventDate={partyData.eventDate}
         items={partyData.items}
         participants={partyData.participants}
-      />
-
-      {/* Vercel Storage Guide Modal */}
-      <VercelStorageGuideModal
-        isOpen={isStorageModalOpen}
-        onClose={() => setIsStorageModalOpen(false)}
-        storageType={storageType}
-        onResetData={handleResetData}
       />
 
     </div>

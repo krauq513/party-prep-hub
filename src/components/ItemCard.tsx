@@ -176,20 +176,21 @@ export default function ItemCard({
   }
 
   // ==========================================
-  // 2. SHARED SINGLE ITEM (공용 단일 품목)
+  // 2. SHARED SINGLE ITEM (공용 단일 품목 - 여러 명 찜 가능)
   // ==========================================
   if (item.type === 'shared_single') {
-    const isAssigned = !!item.assigneeId;
-    const isAssignedToMe = item.assigneeId === currentParticipant.id;
+    const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+    const isPledgedByMe = assignees.some((a) => a.id === currentParticipant.id);
+    const hasAnyPledge = assignees.length > 0;
     const isDone = item.isCompleted;
 
     return (
       <div className={`p-4 rounded-2xl border transition-all ${
         isDone
           ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60 shadow-xs'
-          : isAssignedToMe
+          : isPledgedByMe
           ? 'bg-indigo-50/40 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800 shadow-xs'
-          : isAssigned
+          : hasAnyPledge
           ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-900/60'
           : 'bg-white dark:bg-slate-900 border-amber-200/90 dark:border-amber-900/50 hover:border-amber-300'
       }`}>
@@ -197,14 +198,14 @@ export default function ItemCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
-                공용 단일
+                공용 준비물
               </span>
               <span className="text-[11px] text-slate-400 font-medium">
                 {item.category}
               </span>
-              {!isAssigned ? (
+              {!hasAnyPledge ? (
                 <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> 담당자 없음
+                  <AlertCircle className="w-3 h-3" /> 아직 찜 안 됨
                 </span>
               ) : isDone ? (
                 <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-1">
@@ -212,7 +213,7 @@ export default function ItemCard({
                 </span>
               ) : (
                 <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                  찜 완료 (준비중)
+                  {assignees.length}명 찜함 (준비중)
                 </span>
               )}
             </div>
@@ -228,20 +229,9 @@ export default function ItemCard({
             )}
           </div>
 
-          {/* Action Button: 찜하기 */}
+          {/* Action Button: 찜하기 & 완료 토글 */}
           <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-            {!isAssigned ? (
-              <button
-                onClick={() => {
-                  triggerCelebration();
-                  onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name);
-                }}
-                className="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm active:scale-95 transition-all min-h-[44px] flex items-center gap-1"
-              >
-                <span>🙋</span>
-                <span>내가 찜하기!</span>
-              </button>
-            ) : isAssignedToMe ? (
+            {isPledgedByMe ? (
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => {
@@ -260,17 +250,21 @@ export default function ItemCard({
                 <button
                   onClick={() => onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name)}
                   className="px-2 py-2 text-xs text-slate-400 hover:text-rose-500 min-h-[44px]"
-                  title="찜 취소"
+                  title="내 찜 취소"
                 >
                   취소
                 </button>
               </div>
             ) : (
               <button
-                onClick={() => onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                onClick={() => {
+                  triggerCelebration();
+                  onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name);
+                }}
+                className="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm active:scale-95 transition-all min-h-[44px] flex items-center gap-1"
               >
-                내가 대신 찜
+                <span>🙋</span>
+                <span>{hasAnyPledge ? '나도 찜하기!' : '내가 찜하기!'}</span>
               </button>
             )}
           </div>
@@ -278,14 +272,21 @@ export default function ItemCard({
 
         {/* Footer info & tools */}
         <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">담당:</span>
-            {isAssigned ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                <User className="w-3 h-3" />
-                <span>{item.assigneeName}</span>
-                {isAssignedToMe && <span className="text-[10px] bg-indigo-200 dark:bg-indigo-800 px-1 rounded">나</span>}
-              </span>
+          <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0 mr-2">
+            <span className="text-slate-400">찜:</span>
+            {hasAnyPledge ? (
+              <div className="flex items-center gap-1 flex-wrap">
+                {assignees.map((a) => (
+                  <span
+                    key={a.id}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px]"
+                  >
+                    <User className="w-3 h-3" />
+                    <span>{a.name}</span>
+                    {a.id === currentParticipant.id && <span className="text-[9px] bg-indigo-200 dark:bg-indigo-800 px-1 rounded">나</span>}
+                  </span>
+                ))}
+              </div>
             ) : (
               <span className="text-amber-600 dark:text-amber-400 font-semibold">
                 아직 아무도 찜 안 했어요!

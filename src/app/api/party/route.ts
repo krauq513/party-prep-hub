@@ -51,21 +51,18 @@ export async function POST(req: Request) {
         const { itemId, participantId, participantName } = payload;
         updatedData.items = updatedData.items.map((item) => {
           if (item.id !== itemId) return item;
-          // Toggle off if already assigned to this person
-          if (item.assigneeId === participantId) {
-            return {
-              ...item,
-              assigneeId: undefined,
-              assigneeName: undefined,
-              isCompleted: false,
-              updatedAt: new Date().toISOString(),
-            };
-          }
+          const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+          const exists = currentAssignees.some((a) => a.id === participantId);
+          const newAssignees = exists
+            ? currentAssignees.filter((a) => a.id !== participantId)
+            : [...currentAssignees, { id: participantId, name: participantName }];
+
           return {
             ...item,
-            assigneeId: participantId,
-            assigneeName: participantName,
-            isCompleted: true, // Default to true or active when claimed
+            assignees: newAssignees,
+            assigneeId: newAssignees.length > 0 ? newAssignees[0].id : undefined,
+            assigneeName: newAssignees.length > 0 ? newAssignees[0].name : undefined,
+            isCompleted: newAssignees.length > 0 ? item.isCompleted : false,
             updatedAt: new Date().toISOString(),
           };
         });
