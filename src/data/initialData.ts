@@ -80,9 +80,21 @@ export const INITIAL_PARTY_DATA: PartyData = {
       name: '각종 보드게임',
       category: '오락/비상용품',
       type: 'shared_single',
-      isCompleted: false,
-      assignees: [],
-      boardGames: [],
+      isCompleted: true,
+      assignees: [
+        { id: 'p-leearum', name: '이아름' }
+      ],
+      assigneeId: 'p-leearum',
+      assigneeName: '이아름',
+      boardGames: [
+        {
+          id: 'bg-rummikub-leearum',
+          gameName: '루미큐브',
+          participantId: 'p-leearum',
+          participantName: '이아름',
+          createdAt: new Date().toISOString(),
+        }
+      ],
       notes: '할리갈리, 루미큐브, 뱅 등 챙겨올 게임 이름을 적어주세요!',
       updatedAt: new Date().toISOString(),
     },

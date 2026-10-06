@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PartyData, PartyItem, Participant, FilterCategory, FilterType, FilterStatus } from '@/types/party';
+import { PartyData, PartyItem, Participant, FilterCategory, FilterType, FilterStatus, BoardGameItem, SingleAssignee } from '@/types/party';
 import { INITIAL_PARTY_DATA, INITIAL_PARTICIPANTS } from '@/data/initialData';
 import Header from '@/components/Header';
 import StatsDashboard from '@/components/StatsDashboard';
@@ -43,6 +43,32 @@ export default function PartyPrepPage() {
   const [isPledgeModalOpen, setIsPledgeModalOpen] = useState(false);
   const [pledgeTargetItem, setPledgeTargetItem] = useState<PartyItem | null>(null);
 
+  // Load local cache immediately on mount for instant zero-flicker display
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('party_prep_hub_cached_data_v2');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.items) {
+          setPartyData(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Sync state to local cache whenever partyData changes
+  useEffect(() => {
+    if (partyData && partyData.items && partyData.items.length > 0) {
+      try {
+        localStorage.setItem('party_prep_hub_cached_data_v2', JSON.stringify(partyData));
+      } catch {
+        // ignore
+      }
+    }
+  }, [partyData]);
+
   // 1. Load initial data & saved user
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -51,7 +77,57 @@ export default function PartyPrepPage() {
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
-          setPartyData(json.data);
+          let mergedData = json.data;
+          try {
+            const cached = localStorage.getItem('party_prep_hub_cached_data_v2');
+            if (cached) {
+              const local = JSON.parse(cached);
+              if (local && local.items) {
+                mergedData = {
+                  ...mergedData,
+                  items: mergedData.items.map((srvItem: PartyItem) => {
+                    const localItem = local.items.find((l: PartyItem) => l.id === srvItem.id);
+                    if (!localItem) return srvItem;
+
+                    let nextGames = srvItem.boardGames || [];
+                    if (localItem.boardGames && localItem.boardGames.length > 0) {
+                      const srvIds = new Set(nextGames.map((g) => g.id));
+                      const added = localItem.boardGames.filter((g: BoardGameItem) => !srvIds.has(g.id));
+                      nextGames = [...nextGames, ...added];
+                    }
+
+                    let nextAssignees = srvItem.assignees || [];
+                    if (localItem.assignees && localItem.assignees.length > 0) {
+                      const srvAIds = new Set(nextAssignees.map((a) => a.id));
+                      const addedA = localItem.assignees.filter((a: SingleAssignee) => !srvAIds.has(a.id));
+                      nextAssignees = [...nextAssignees, ...addedA];
+                    }
+
+                    const nextCompleted = Array.from(
+                      new Set([...(srvItem.completedBy || []), ...(localItem.completedBy || [])])
+                    );
+
+                    return {
+                      ...srvItem,
+                      boardGames: nextGames,
+                      assignees: nextAssignees,
+                      completedBy: nextCompleted,
+                      isCompleted: srvItem.isCompleted || localItem.isCompleted || nextCompleted.length > 0,
+                    };
+                  }),
+                };
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          setPartyData(mergedData);
+          try {
+            localStorage.setItem('party_prep_hub_cached_data_v2', JSON.stringify(mergedData));
+          } catch {
+            // ignore
+          }
 
           // Restore saved user or open welcome modal
           const savedUserId = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
