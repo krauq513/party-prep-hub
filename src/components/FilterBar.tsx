@@ -70,12 +70,12 @@ export default function FilterBar({
         </div>
 
         {/* Status view tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 self-start md:self-auto overflow-x-auto max-w-full">
+        <div className="grid grid-cols-3 md:flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 w-full md:w-auto">
           <button
             onClick={() => onSelectStatus('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap min-h-[36px] ${
+            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-center flex items-center justify-center min-h-[36px] ${
               selectedStatus === 'all'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -84,72 +84,78 @@ export default function FilterBar({
           
           <button
             onClick={() => onSelectStatus('my_items')}
-            className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex items-center gap-1 min-h-[36px] ${
+            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1 min-h-[36px] ${
               selectedStatus === 'my_items'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/30 font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <span>🙋‍♂️</span>
-            <span>내 챙길 목록</span>
+            <span className="truncate">내 챙길 목록</span>
           </button>
 
           <button
             onClick={() => onSelectStatus('incomplete')}
-            className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex items-center gap-1 min-h-[36px] ${
+            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1 min-h-[36px] ${
               selectedStatus === 'incomplete'
-                ? 'bg-amber-600 text-white shadow-sm shadow-amber-600/30'
+                ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/30 font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <span>⚠️</span>
-            <span>부족/미정만</span>
+            <span className="truncate">부족/미정만</span>
           </button>
         </div>
 
       </div>
 
-      {/* Category Pills & Type Filter */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pt-1">
+      {/* Category Grid (3x3 on mobile, 9 cols on desktop) & Type Filter */}
+      <div className="space-y-2 pt-1">
         
-        {/* Category Pills (horizontal scrollable on mobile) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+        {/* Category Pills 3x3 Grid */}
+        <div className="grid grid-cols-3 md:grid-cols-9 gap-1.5 w-full">
           {CATEGORIES.map((cat) => {
             const isSelected = selectedCategory === cat.label;
             return (
               <button
                 key={cat.label}
                 onClick={() => onSelectCategory(cat.label)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border min-h-[36px] flex items-center gap-1 ${
+                className={`px-1.5 sm:px-2 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition-all border min-h-[38px] flex items-center justify-center gap-1 active:scale-95 ${
                   isSelected
-                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-sm'
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs font-bold'
                     : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
-                <span>{cat.emoji}</span>
-                <span>{cat.label}</span>
+                <span className="text-xs sm:text-sm flex-shrink-0">{cat.emoji}</span>
+                <span className="truncate">{cat.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Type select & Count */}
-        <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
-          <select
-            value={selectedType}
-            onChange={(e) => onSelectType(e.target.value as FilterType)}
-            aria-label="유형 필터"
-            className="text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 min-h-[36px]"
-          >
-            <option value="all">모든 유형</option>
-            <option value="personal">🎒 개인 필수만</option>
-            <option value="shared_single">👑 공용 단일만</option>
-            <option value="shared_quantity">📦 공용 수량형만</option>
-          </select>
-          
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-            {filteredCount} / {totalCount}개
-          </span>
+        {/* Type select & Count Sub-bar */}
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+            카테고리: <span className="font-bold text-slate-900 dark:text-white">{selectedCategory}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <select
+              value={selectedType}
+              onChange={(e) => onSelectType(e.target.value as FilterType)}
+              aria-label="유형 필터"
+              className="text-[11px] sm:text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 min-h-[32px]"
+            >
+              <option value="all">모든 유형</option>
+              <option value="personal">🎒 개인 필수</option>
+              <option value="shared_single">👑 공용 단일</option>
+              <option value="shared_quantity">📦 공용 수량</option>
+            </select>
+            
+            <span className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+              {filteredCount} / {totalCount}개
+            </span>
+          </div>
         </div>
 
       </div>
