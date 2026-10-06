@@ -98,7 +98,7 @@ export default function Header({
                 >
                   {participants.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.avatar} {p.name} {p.isLeader ? '(주최)' : ''}
+                      {p.avatar} {p.name}
                     </option>
                   ))}
                 </select>

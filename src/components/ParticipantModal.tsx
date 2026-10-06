@@ -114,11 +114,6 @@ export default function ParticipantModal({
                         <span className="font-bold text-sm text-slate-900 dark:text-white">
                           {p.name}
                         </span>
-                        {p.isLeader && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
-                            주최자
-                          </span>
-                        )}
                         {isCurrent && (
                           <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300">
                             나 (접속 중)

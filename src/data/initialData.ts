@@ -12,7 +12,7 @@ export const INITIAL_PARTICIPANTS: Participant[] = [
   { id: 'p-jaewon', name: '재원', avatar: '🐻', color: '#6366f1' },
   { id: 'p-jungha', name: '중하', avatar: '🚀', color: '#8b5cf6' },
   { id: 'p-jungeun', name: '준근', avatar: '🐨', color: '#14b8a6' },
-  { id: 'p-taehyun', name: '태현', avatar: '👑', color: '#f59e0b', isLeader: true },
+  { id: 'p-taehyun', name: '태현', avatar: '🍺', color: '#f59e0b' },
   { id: 'p-hyunjung', name: '현정', avatar: '🦄', color: '#d946ef' },
   { id: 'p-hongarum', name: '홍아름', avatar: '🍒', color: '#ef4444' },
 ];
