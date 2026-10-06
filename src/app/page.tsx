@@ -1,101 +1,596 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useEffect, useCallback } from 'react';
+import { PartyData, PartyItem, Participant, FilterCategory, FilterType, FilterStatus } from '@/types/party';
+import { INITIAL_PARTY_DATA, INITIAL_PARTICIPANTS } from '@/data/initialData';
+import Header from '@/components/Header';
+import StatsDashboard from '@/components/StatsDashboard';
+import FilterBar from '@/components/FilterBar';
+import ItemCard from '@/components/ItemCard';
+import AddItemModal from '@/components/AddItemModal';
+import ParticipantModal from '@/components/ParticipantModal';
+import ReportModal from '@/components/ReportModal';
+import VercelStorageGuideModal from '@/components/VercelStorageGuideModal';
+import PledgeModal from '@/components/PledgeModal';
+import MobileBottomNav from '@/components/MobileBottomNav';
+import { Plus } from 'lucide-react';
+
+const LOCAL_STORAGE_USER_KEY = 'party_current_participant_id_v2';
+
+export default function PartyPrepPage() {
+  const [partyData, setPartyData] = useState<PartyData>(INITIAL_PARTY_DATA);
+  const [currentParticipant, setCurrentParticipant] = useState<Participant>(INITIAL_PARTICIPANTS[0]);
+  const [storageType, setStorageType] = useState<'redis' | 'local_file' | 'in_memory'>('in_memory');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<FilterCategory>('전체');
+  const [selectedType, setSelectedType] = useState<FilterType>('all');
+  const [selectedStatus, setSelectedStatus] = useState<FilterStatus>('all');
+
+  // Modals
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState<PartyItem | null>(null);
+  const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+
+  // 찜하기 (Pledge) Modal
+  const [isPledgeModalOpen, setIsPledgeModalOpen] = useState(false);
+  const [pledgeTargetItem, setPledgeTargetItem] = useState<PartyItem | null>(null);
+
+  // 1. Load initial data & saved user
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/party');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setPartyData(json.data);
+          if (json.storageType) {
+            setStorageType(json.storageType);
+          }
+
+          // Restore saved user or default to first
+          const savedUserId = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+          if (savedUserId) {
+            const found = json.data.participants.find((p: Participant) => p.id === savedUserId);
+            if (found) setCurrentParticipant(found);
+          } else if (json.data.participants?.length > 0) {
+            setCurrentParticipant(json.data.participants[0]);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Fetch party data failed, using initial state:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Handle participant change
+  const handleSelectParticipant = (p: Participant) => {
+    setCurrentParticipant(p);
+    localStorage.setItem(LOCAL_STORAGE_USER_KEY, p.id);
+  };
+
+  // Helper to send backend updates
+  const sendAction = async (action: string, payload: unknown) => {
+    try {
+      const res = await fetch('/api/party', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setPartyData(json.data);
+          if (json.storageType) setStorageType(json.storageType);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update action:', err);
+    }
+  };
+
+  // --- Actions ---
+
+  const handleTogglePersonal = (itemId: string, participantId: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const currentList = item.completedBy || [];
+        const exists = currentList.includes(participantId);
+        const newList = exists
+          ? currentList.filter((id) => id !== participantId)
+          : [...currentList, participantId];
+        return { ...item, completedBy: newList };
+      }),
+    }));
+
+    sendAction('toggle_personal', { itemId, participantId });
+  };
+
+  const handleClaimSharedSingle = (itemId: string, participantId: string, participantName: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        if (item.assigneeId === participantId) {
+          return {
+            ...item,
+            assigneeId: undefined,
+            assigneeName: undefined,
+            isCompleted: false,
+          };
+        }
+        return {
+          ...item,
+          assigneeId: participantId,
+          assigneeName: participantName,
+          isCompleted: false, // Default to in progress when pledged
+        };
+      }),
+    }));
+
+    sendAction('claim_shared_single', { itemId, participantId, participantName });
+  };
+
+  const handleToggleSharedComplete = (itemId: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        return { ...item, isCompleted: !item.isCompleted };
+      }),
+    }));
+
+    sendAction('toggle_shared_complete', { itemId });
+  };
+
+  // 찜하기 모달 열기
+  const handleOpenPledgeModal = (item: PartyItem) => {
+    setPledgeTargetItem(item);
+    setIsPledgeModalOpen(true);
+  };
+
+  // 찜하기 저장
+  const handleSavePledge = (itemId: string, quantity: number, note?: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const currentContribs = item.contributions || [];
+        const existingIndex = currentContribs.findIndex((c) => c.participantId === currentParticipant.id);
+
+        const newContribs = [...currentContribs];
+        if (existingIndex >= 0) {
+          newContribs[existingIndex] = {
+            participantId: currentParticipant.id,
+            participantName: currentParticipant.name,
+            quantity,
+            note,
+          };
+        } else {
+          newContribs.push({
+            participantId: currentParticipant.id,
+            participantName: currentParticipant.name,
+            quantity,
+            note,
+          });
+        }
+        return { ...item, contributions: newContribs };
+      }),
+    }));
+
+    sendAction('update_quantity_contribution', {
+      itemId,
+      participantId: currentParticipant.id,
+      participantName: currentParticipant.name,
+      quantity,
+      note,
+    });
+  };
+
+  // 찜하기 취소 (0개로 변경)
+  const handleCancelPledge = (itemId: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        return {
+          ...item,
+          contributions: (item.contributions || []).filter((c) => c.participantId !== currentParticipant.id),
+        };
+      }),
+    }));
+
+    sendAction('update_quantity_contribution', {
+      itemId,
+      participantId: currentParticipant.id,
+      participantName: currentParticipant.name,
+      quantity: 0,
+    });
+  };
+
+  // 목표 수량 즉시 변경
+  const handleUpdateTargetQuantity = (itemId: string, newTarget: number) => {
+    if (newTarget < 1) return;
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => (item.id === itemId ? { ...item, targetQuantity: newTarget } : item)),
+    }));
+    sendAction('edit_item', { id: itemId, updates: { targetQuantity: newTarget } });
+  };
+
+  const handleSaveItem = (itemPayload: Partial<PartyItem>) => {
+    if (editItem) {
+      sendAction('edit_item', { id: editItem.id, updates: itemPayload });
+      setEditItem(null);
+    } else {
+      sendAction('add_item', itemPayload);
+    }
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.filter((i) => i.id !== itemId),
+    }));
+    sendAction('delete_item', { itemId });
+  };
+
+  const handleAddParticipant = (name: string, avatar: string) => {
+    sendAction('add_participant', {
+      name,
+      avatar,
+      color: '#3b82f6',
+    });
+  };
+
+  const handleResetData = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/party', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) setPartyData(json.data);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Counts for Badges ---
+  const myPledgedCount = partyData.items.filter((item) => {
+    if (item.type === 'personal') return (item.completedBy || []).includes(currentParticipant.id);
+    if (item.type === 'shared_single') return item.assigneeId === currentParticipant.id;
+    if (item.type === 'shared_quantity') return (item.contributions || []).some((c) => c.participantId === currentParticipant.id);
+    return false;
+  }).length;
+
+  const incompleteCount = partyData.items.filter((item) => {
+    if (item.type === 'personal') return !(item.completedBy || []).includes(currentParticipant.id);
+    if (item.type === 'shared_single') return !item.assigneeId || !item.isCompleted;
+    if (item.type === 'shared_quantity') {
+      const sum = (item.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
+      return sum < (item.targetQuantity || 1);
+    }
+    return false;
+  }).length;
+
+  // --- Filtering Logic ---
+  const filteredItems = partyData.items.filter((item) => {
+    // 1. Search Query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      const matchName = item.name.toLowerCase().includes(query);
+      const matchCategory = item.category.toLowerCase().includes(query);
+      const matchNotes = item.notes?.toLowerCase().includes(query);
+      const matchAssignee = item.assigneeName?.toLowerCase().includes(query);
+      const matchContrib = item.contributions?.some((c) => c.participantName.toLowerCase().includes(query));
+      if (!matchName && !matchCategory && !matchNotes && !matchAssignee && !matchContrib) {
+        return false;
+      }
+    }
+
+    // 2. Category Filter
+    if (selectedCategory !== '전체' && item.category !== selectedCategory) {
+      return false;
+    }
+
+    // 3. Type Filter
+    if (selectedType !== 'all' && item.type !== selectedType) {
+      return false;
+    }
+
+    // 4. Status Filter
+    if (selectedStatus === 'my_items') {
+      if (item.type === 'personal') {
+        return true;
+      }
+      if (item.type === 'shared_single') {
+        return item.assigneeId === currentParticipant.id;
+      }
+      if (item.type === 'shared_quantity') {
+        return item.contributions?.some((c) => c.participantId === currentParticipant.id);
+      }
+    }
+
+    if (selectedStatus === 'incomplete') {
+      if (item.type === 'personal') {
+        return !(item.completedBy || []).includes(currentParticipant.id);
+      }
+      if (item.type === 'shared_single') {
+        return !item.assigneeId || !item.isCompleted;
+      }
+      if (item.type === 'shared_quantity') {
+        const currentSum = (item.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
+        return currentSum < (item.targetQuantity || 1);
+      }
+    }
+
+    return true;
+  });
+
+  const categoriesInOrder: FilterCategory[] = [
+    '개인필수',
+    '식기',
+    '고기/메인',
+    '채소/곁들임',
+    '양념/소스',
+    '주류/음료',
+    '식사/안주',
+    '오락/비상용품',
+  ];
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors pb-28 md:pb-16">
+      
+      {/* Header */}
+      <Header
+        title={partyData.title}
+        eventDate={partyData.eventDate}
+        location={partyData.location}
+        participants={partyData.participants}
+        currentParticipant={currentParticipant}
+        onSelectParticipant={handleSelectParticipant}
+        onOpenAddModal={() => {
+          setEditItem(null);
+          setIsAddModalOpen(true);
+        }}
+        onOpenReportModal={() => setIsReportModalOpen(true)}
+        onOpenParticipantModal={() => setIsParticipantModalOpen(true)}
+        onOpenStorageModal={() => setIsStorageModalOpen(true)}
+        onRefresh={fetchData}
+        isLoading={isLoading}
+        storageType={storageType}
+      />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+      {/* Main Container */}
+      <main className="max-w-6xl mx-auto px-3.5 py-4 sm:px-6 sm:py-6">
+        
+        {/* Overall Stats Dashboard */}
+        <StatsDashboard
+          items={partyData.items}
+          participants={partyData.participants}
+          currentParticipant={currentParticipant}
+          onFilterMissing={() => {
+            setSelectedStatus('incomplete');
+            setSelectedCategory('전체');
+          }}
+          onFilterMyItems={() => {
+            setSelectedStatus('my_items');
+            setSelectedCategory('전체');
+          }}
+        />
+
+        {/* Filter Bar */}
+        <FilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+          selectedType={selectedType}
+          onSelectType={setSelectedType}
+          selectedStatus={selectedStatus}
+          onSelectStatus={setSelectedStatus}
+          filteredCount={filteredItems.length}
+          totalCount={partyData.items.length}
+        />
+
+        {/* Items List */}
+        {filteredItems.length === 0 ? (
+          <div className="text-center py-16 px-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+            <div className="text-4xl mb-3">🔍</div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+              일치하는 준비물이 없습니다
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              검색어나 필터 조건을 변경하거나 새 준비물을 추가해보세요.
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('전체');
+                  setSelectedStatus('all');
+                  setSelectedType('all');
+                }}
+                className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 transition-colors"
+              >
+                필터 초기화
+              </button>
+              <button
+                onClick={() => {
+                  setEditItem(null);
+                  setIsAddModalOpen(true);
+                }}
+                className="px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-colors"
+              >
+                + 준비물 추가하기
+              </button>
+            </div>
+          </div>
+        ) : selectedCategory === '전체' && !searchQuery ? (
+          // Grouped Display by Category
+          <div className="space-y-6 sm:space-y-8">
+            {categoriesInOrder.map((cat) => {
+              const categoryItems = filteredItems.filter((i) => i.category === cat);
+              if (categoryItems.length === 0) return null;
+
+              return (
+                <section key={cat} className="space-y-2.5 sm:space-y-3">
+                  <div className="flex items-center gap-2 pb-1 border-b border-slate-200/80 dark:border-slate-800">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                      {cat}
+                    </h3>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      {categoryItems.length}개
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {categoryItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        participants={partyData.participants}
+                        currentParticipant={currentParticipant}
+                        onTogglePersonal={handleTogglePersonal}
+                        onClaimSharedSingle={handleClaimSharedSingle}
+                        onToggleSharedComplete={handleToggleSharedComplete}
+                        onOpenPledgeModal={handleOpenPledgeModal}
+                        onDeleteItem={handleDeleteItem}
+                        onEditItem={(item) => {
+                          setEditItem(item);
+                          setIsAddModalOpen(true);
+                        }}
+                        onUpdateTargetQuantity={handleUpdateTargetQuantity}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : (
+          // Flat List for filtered or searched view
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            {filteredItems.map((item) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                participants={partyData.participants}
+                currentParticipant={currentParticipant}
+                onTogglePersonal={handleTogglePersonal}
+                onClaimSharedSingle={handleClaimSharedSingle}
+                onToggleSharedComplete={handleToggleSharedComplete}
+                onOpenPledgeModal={handleOpenPledgeModal}
+                onDeleteItem={handleDeleteItem}
+                onEditItem={(item) => {
+                  setEditItem(item);
+                  setIsAddModalOpen(true);
+                }}
+                onUpdateTargetQuantity={handleUpdateTargetQuantity}
+              />
+            ))}
+          </div>
+        )}
+
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+      {/* Floating Add Button for Desktop */}
+      <button
+        onClick={() => {
+          setEditItem(null);
+          setIsAddModalOpen(true);
+        }}
+        className="hidden md:flex fixed bottom-8 right-8 px-4 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-xl shadow-indigo-600/30 items-center gap-2 font-bold text-sm active:scale-95 transition-all z-30"
+        aria-label="준비물 추가"
+      >
+        <Plus className="w-5 h-5" />
+        <span>새 준비물 추가</span>
+      </button>
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      <MobileBottomNav
+        selectedStatus={selectedStatus}
+        onSelectStatus={setSelectedStatus}
+        onOpenAddModal={() => {
+          setEditItem(null);
+          setIsAddModalOpen(true);
+        }}
+        onOpenReportModal={() => setIsReportModalOpen(true)}
+        myPledgedCount={myPledgedCount}
+        incompleteCount={incompleteCount}
+      />
+
+      {/* 찜하기 (Pledge) Modal */}
+      <PledgeModal
+        isOpen={isPledgeModalOpen}
+        onClose={() => {
+          setIsPledgeModalOpen(false);
+          setPledgeTargetItem(null);
+        }}
+        item={pledgeTargetItem}
+        currentParticipant={currentParticipant}
+        onSavePledge={handleSavePledge}
+        onCancelPledge={handleCancelPledge}
+      />
+
+      {/* Add / Edit Modal */}
+      <AddItemModal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditItem(null);
+        }}
+        onSave={handleSaveItem}
+        editItem={editItem}
+      />
+
+      {/* Participant Management Modal */}
+      <ParticipantModal
+        isOpen={isParticipantModalOpen}
+        onClose={() => setIsParticipantModalOpen(false)}
+        participants={partyData.participants}
+        currentParticipant={currentParticipant}
+        items={partyData.items}
+        onSelectParticipant={handleSelectParticipant}
+        onAddParticipant={handleAddParticipant}
+      />
+
+      {/* Status Report Modal */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        title={partyData.title}
+        eventDate={partyData.eventDate}
+        items={partyData.items}
+        participants={partyData.participants}
+      />
+
+      {/* Vercel Storage Guide Modal */}
+      <VercelStorageGuideModal
+        isOpen={isStorageModalOpen}
+        onClose={() => setIsStorageModalOpen(false)}
+        storageType={storageType}
+        onResetData={handleResetData}
+      />
+
     </div>
   );
 }

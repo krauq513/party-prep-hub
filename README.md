@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎉 파티 준비물 체크 허브 (PartyPacker)
 
-## Getting Started
+친구들과 함께하는 파티/여행에서 각자 준비물을 챙기고 현황을 실시간으로 확인 및 공유할 수 있는 **Vercel 기반 웹 애플리케이션**입니다.
 
-First, run the development server:
+***
+
+## ✨ 주요 기능
+
+- **준비물 특성별 세분화 관리**:
+  - 🎒 **개인 필수 준비물**: 참가자 각자 본인이 챙겼는지 개별 체크 (수건, 세면도구, 여벌옷, 이어플러그, 담요 등)
+  - 👑 **공용 단일 준비물**: 1명이 책임지고 챙기는 담당자 지정형 (각종 보드게임, 상비약, 양주[태현사장님 찬스] 등)
+  - 📦 **공용 수량 목표형**: 여러 명이 나누어 목표 수량을 채우는 분담형 (고기 2kg, 소주 8병, 맥주 12캔, 일회용 식기류 등)
+- **참가자 식별 및 프로필 전환**:
+  - 현재 접속자를 선택하여 "내가 챙길 것"만 원클릭 필터링
+  - 참가자별 총 기여도 및 준비 진척도 요약
+  - 새 친구/참가자 등록 (닉네임 + 캐릭터 이모지)
+- **단톡방/카카오톡 현황 보고서 원클릭 생성**:
+  - '현황 보고' 버튼 클릭 시 전체 완료율, 아직 부족한 준비물 목록, 참가자별 기여 내역을 정돈된 텍스트로 즉시 클립보드 복사
+- **실시간 진척도 대시보드 & 폭죽 효과**:
+  - 종합 준비율 프로그레스 바
+  - 부족하거나 미정인 항목만 모아보는 퀵 필터
+  - 준비 완료 시 기분 좋은 축하 애니메이션(Confetti)
+
+***
+
+## 📋 기본 탑재 준비물 목록
+
+사용자 요청에 따라 파티에 필요한 모든 품목이 사전 구성되어 있습니다:
+
+- **개인 필수**: 수건, 세면도구, 이어플러그(권장), 여벌옷, 담요(에어컨 풀가동 대비)
+- **식기 & 일회용품**: 일회용 소주잔(30개), 물컵(20개), 나무젓가락(20벌), 숟가락(20개), 앞접시(20개), 키친타올(2롤), 휴지(2롤), 물티슈(2팩)
+- **고기 & 메인 요리**: 고기(삼겹살, 목살 2kg), 새우(1팩), 소세지(2팩), 육회(1팩), 계란(10알), 찌개밀키트(2개)
+- **채소 & 곁들임**: 상추(2봉), 고추(1봉), 마늘(1봉), 양파(3개), 버섯(2팩), 김치(1통), 된장/쌈장(1통)
+- **양념 & 소스**: 소금/허브솔트(1개), 참기름(1병), 생와사비(1개)
+- **주류 & 음료**: 양주(태현사장님 사전지정 🥃), 소주(8병), 맥주(12캔), 토닉워터(6병), 음료(제로포함 6캔), 생수(6병), 각얼음(2봉), 숙취해소제(6개)
+- **식사 & 안주**: 햇반(8개), 라면(8봉), 과자(4봉), 마른안주(2봉)
+- **오락 & 비상용품**: 각종 보드게임(1세트), 상비약(1세트)
+
+***
+
+## 🚀 로컬 실행 방법
 
 ```bash
+# 1. 의존성 설치
+npm install
+
+# 2. 로컬 개발 서버 실행
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 `http://localhost:3000` 접속 시 즉시 사용 가능합니다.
+로컬 모드에서는 `data/party-data.json` 파일에 변경 내용이 자동 저장됩니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+***
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ☁️ Vercel 배포 및 실시간 멀티유저 동기화 가이드
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **GitHub 저장소에 Push**:
+   ```bash
+   git add .
+   git commit -m "feat: 파티 준비물 체크 허브 웹사이트 구현"
+   git push origin main
+   ```
+2. **Vercel 연동**:
+   - [Vercel](https://vercel.com)에 로그인 후 GitHub 저장소를 Import하여 배포합니다.
+3. **1클릭 클라우드 DB (Vercel KV / Upstash) 연결**:
+   - Vercel 프로젝트 페이지 상단의 **Storage** 탭 이동
+   - **KV** (또는 Upstash Redis 무료 플랜) 생성 후 **Connect** 버튼 클릭
+   - 환경변수(`KV_REST_API_URL`, `KV_REST_API_TOKEN`)가 자동 연결됩니다.
+   - 이제 모든 참가자가 각자의 스마트폰/PC에서 접속해도 실시간으로 영구 저장 및 동기화됩니다!
