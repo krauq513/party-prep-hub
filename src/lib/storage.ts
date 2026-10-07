@@ -60,6 +60,13 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
                 }
               }
             }
+            // Auto-migrate 양주 -> 칵테일
+            const cocktailItem = data.items.find((i) => i.id === 'item-32' || i.name === '양주');
+            if (cocktailItem && cocktailItem.name === '양주') {
+              cocktailItem.name = '칵테일';
+              cocktailItem.notes = '하이볼, 칵테일 제조용 주류/베이스 🍸 찜하기 및 종류 등록 환영!';
+            }
+
             globalForParty.partyData = data;
             return { data, storageType: 'blob' };
           }

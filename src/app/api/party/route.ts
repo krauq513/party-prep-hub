@@ -68,13 +68,22 @@ export async function POST(req: Request) {
             ? (item.completedBy || []).filter((id) => id !== participantId)
             : (item.completedBy || []);
 
+          const nextGames = exists
+            ? (item.boardGames || []).filter((g) => g.participantId !== participantId)
+            : (item.boardGames || []);
+          const nextSubs = exists
+            ? (item.subItems || []).filter((s) => s.participantId !== participantId)
+            : (item.subItems || []);
+
           return {
             ...item,
             assignees: newAssignees,
             assigneeId: newAssignees.length > 0 ? newAssignees[0].id : undefined,
             assigneeName: newAssignees.length > 0 ? newAssignees[0].name : undefined,
             completedBy: newCompletedBy,
-            isCompleted: newCompletedBy.length > 0,
+            boardGames: nextGames,
+            subItems: nextSubs,
+            isCompleted: newAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0,
             updatedAt: new Date().toISOString(),
           };
         });
@@ -303,8 +312,17 @@ export async function POST(req: Request) {
 
           let newContribs = [...currentContribs];
           if (quantity <= 0) {
-            // Remove contribution
+            // Remove contribution, subItems, and completed status for this participant
             newContribs = newContribs.filter((c) => c.participantId !== participantId);
+            const newCompletedBy = (item.completedBy || []).filter((id) => id !== participantId);
+            const nextSubs = (item.subItems || []).filter((s) => s.participantId !== participantId);
+            return {
+              ...item,
+              contributions: newContribs,
+              completedBy: newCompletedBy,
+              subItems: nextSubs,
+              updatedAt: new Date().toISOString(),
+            };
           } else if (existingIndex >= 0) {
             // Update contribution
             newContribs[existingIndex] = {
@@ -326,6 +344,32 @@ export async function POST(req: Request) {
           return {
             ...item,
             contributions: newContribs,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        break;
+      }
+
+      case 'cancel_pledge': {
+        const { itemId, participantId } = payload;
+        updatedData.items = updatedData.items.map((item) => {
+          if (item.id !== itemId) return item;
+          const nextAssignees = (item.assignees || []).filter((a) => a.id !== participantId);
+          const nextGames = (item.boardGames || []).filter((g) => g.participantId !== participantId);
+          const nextSubs = (item.subItems || []).filter((s) => s.participantId !== participantId);
+          const nextContribs = (item.contributions || []).filter((c) => c.participantId !== participantId);
+          const nextCompleted = (item.completedBy || []).filter((id) => id !== participantId);
+
+          return {
+            ...item,
+            assignees: nextAssignees,
+            assigneeId: nextAssignees[0]?.id,
+            assigneeName: nextAssignees[0]?.name,
+            boardGames: nextGames,
+            subItems: nextSubs,
+            contributions: nextContribs,
+            completedBy: nextCompleted,
+            isCompleted: item.type === 'shared_single' ? (nextAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0) : nextCompleted.length > 0,
             updatedAt: new Date().toISOString(),
           };
         });

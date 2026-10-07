@@ -62,7 +62,23 @@ export default function PledgeModal({
 
   let currentNotePresets = NOTE_PRESETS;
   const itemName = (item.name || '').toLowerCase();
-  if (itemName.includes('라면')) {
+  if (itemName.includes('칵테일') || itemName.includes('양주') || itemName.includes('와인') || itemName.includes('위스키') || itemName.includes('하이볼')) {
+    currentNotePresets = ['진토닉', '모히또', '하이볼', '깔루아', '위스키', ...NOTE_PRESETS];
+  } else if (itemName.includes('고기') || itemName.includes('삼겹살') || itemName.includes('목살')) {
+    currentNotePresets = ['삼겹살', '목살', '소고기', '항정살', ...NOTE_PRESETS];
+  } else if (itemName.includes('맥주')) {
+    currentNotePresets = ['카스', '테라', '켈리', '아사히', '칭따오', ...NOTE_PRESETS];
+  } else if (itemName.includes('소주')) {
+    currentNotePresets = ['참이슬', '처음처럼', '새로', '진로', ...NOTE_PRESETS];
+  } else if (itemName.includes('음료')) {
+    currentNotePresets = ['제로콜라', '사이다', '환타', '토닉워터', ...NOTE_PRESETS];
+  } else if (itemName.includes('찌개') || itemName.includes('밀키트')) {
+    currentNotePresets = ['부대찌개', '김치찌개', '된장찌개', '어묵탕', ...NOTE_PRESETS];
+  } else if (itemName.includes('상비약')) {
+    currentNotePresets = ['타이레놀', '소화제', '밴드', '소독약', ...NOTE_PRESETS];
+  } else if (itemName.includes('소세지') || itemName.includes('소시지')) {
+    currentNotePresets = ['그릴소세지', '킬바사', '프랑크', '비엔나', ...NOTE_PRESETS];
+  } else if (itemName.includes('라면')) {
     currentNotePresets = ['신라면', '진라면', '너구리', '짜파게티', '불닭', ...NOTE_PRESETS];
   } else if (itemName.includes('과자')) {
     currentNotePresets = ['포카칩', '새우깡', '홈런볼', '프링글스', '먹태깡', ...NOTE_PRESETS];

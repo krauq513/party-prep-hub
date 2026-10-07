@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PartyData, PartyItem, Participant, FilterCategory, FilterType, FilterStatus, BoardGameItem, SingleAssignee, CustomSubItem } from '@/types/party';
+import { PartyData, PartyItem, Participant, FilterCategory, FilterType, FilterStatus, CustomSubItem } from '@/types/party';
 import { INITIAL_PARTY_DATA, INITIAL_PARTICIPANTS } from '@/data/initialData';
 import Header from '@/components/Header';
 import StatsDashboard from '@/components/StatsDashboard';
@@ -73,66 +73,13 @@ export default function PartyPrepPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/party');
+      const res = await fetch(`/api/party?t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
-          let mergedData = json.data;
+          setPartyData(json.data);
           try {
-            const cached = localStorage.getItem('party_prep_hub_cached_data_v2');
-            if (cached) {
-              const local = JSON.parse(cached);
-              if (local && local.items) {
-                mergedData = {
-                  ...mergedData,
-                  items: mergedData.items.map((srvItem: PartyItem) => {
-                    const localItem = local.items.find((l: PartyItem) => l.id === srvItem.id);
-                    if (!localItem) return srvItem;
-
-                    let nextGames = srvItem.boardGames || [];
-                    if (localItem.boardGames && localItem.boardGames.length > 0) {
-                      const srvIds = new Set(nextGames.map((g) => g.id));
-                      const added = localItem.boardGames.filter((g: BoardGameItem) => !srvIds.has(g.id));
-                      nextGames = [...nextGames, ...added];
-                    }
-
-                    let nextSubItems = srvItem.subItems || [];
-                    if (localItem.subItems && localItem.subItems.length > 0) {
-                      const srvSubIds = new Set(nextSubItems.map((s) => s.id));
-                      const addedSub = localItem.subItems.filter((s: CustomSubItem) => !srvSubIds.has(s.id));
-                      nextSubItems = [...nextSubItems, ...addedSub];
-                    }
-
-                    let nextAssignees = srvItem.assignees || [];
-                    if (localItem.assignees && localItem.assignees.length > 0) {
-                      const srvAIds = new Set(nextAssignees.map((a) => a.id));
-                      const addedA = localItem.assignees.filter((a: SingleAssignee) => !srvAIds.has(a.id));
-                      nextAssignees = [...nextAssignees, ...addedA];
-                    }
-
-                    const nextCompleted = Array.from(
-                      new Set([...(srvItem.completedBy || []), ...(localItem.completedBy || [])])
-                    );
-
-                    return {
-                      ...srvItem,
-                      boardGames: nextGames,
-                      subItems: nextSubItems,
-                      assignees: nextAssignees,
-                      completedBy: nextCompleted,
-                      isCompleted: srvItem.isCompleted || localItem.isCompleted || nextCompleted.length > 0,
-                    };
-                  }),
-                };
-              }
-            }
-          } catch {
-            // ignore
-          }
-
-          setPartyData(mergedData);
-          try {
-            localStorage.setItem('party_prep_hub_cached_data_v2', JSON.stringify(mergedData));
+            localStorage.setItem('party_prep_hub_cached_data_v2', JSON.stringify(json.data));
           } catch {
             // ignore
           }
@@ -153,7 +100,18 @@ export default function PartyPrepPage() {
         }
       }
     } catch (err) {
-      console.warn('Fetch party data failed, using initial state:', err);
+      console.warn('Fetch party data failed, using offline cache fallback:', err);
+      try {
+        const cached = localStorage.getItem('party_prep_hub_cached_data_v2');
+        if (cached) {
+          const local = JSON.parse(cached);
+          if (local && local.items) {
+            setPartyData(local);
+          }
+        }
+      } catch {
+        // ignore
+      }
       const savedUserId = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
       if (!savedUserId) {
         setIsWelcomeModalOpen(true);
@@ -190,6 +148,11 @@ export default function PartyPrepPage() {
         const json = await res.json();
         if (json.data) {
           setPartyData(json.data);
+          try {
+            localStorage.setItem('party_prep_hub_cached_data_v2', JSON.stringify(json.data));
+          } catch {
+            // ignore
+          }
         }
       }
     } catch (err) {
@@ -235,13 +198,23 @@ export default function PartyPrepPage() {
           ? (item.completedBy || []).filter((id) => id !== participantId)
           : (item.completedBy || []);
 
+        const nextGames = exists
+          ? (item.boardGames || []).filter((g) => g.participantId !== participantId)
+          : (item.boardGames || []);
+
+        const nextSubs = exists
+          ? (item.subItems || []).filter((s) => s.participantId !== participantId)
+          : (item.subItems || []);
+
         return {
           ...item,
           assignees: newAssignees,
           assigneeId: newAssignees.length > 0 ? newAssignees[0].id : undefined,
           assigneeName: newAssignees.length > 0 ? newAssignees[0].name : undefined,
           completedBy: newCompletedBy,
-          isCompleted: newCompletedBy.length > 0,
+          boardGames: nextGames,
+          subItems: nextSubs,
+          isCompleted: newAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0,
         };
       }),
     }));
@@ -305,24 +278,35 @@ export default function PartyPrepPage() {
     });
   };
 
-  // 찜하기 취소 (0개로 변경)
+  // 찜하기 취소 (0개로 변경 및 모든 참여 내역 완전 삭제)
   const handleCancelPledge = (itemId: string) => {
     setPartyData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
         if (item.id !== itemId) return item;
+        const nextAssignees = (item.assignees || []).filter((a) => a.id !== currentParticipant.id);
+        const nextGames = (item.boardGames || []).filter((g) => g.participantId !== currentParticipant.id);
+        const nextSubs = (item.subItems || []).filter((s) => s.participantId !== currentParticipant.id);
+        const nextContribs = (item.contributions || []).filter((c) => c.participantId !== currentParticipant.id);
+        const nextCompleted = (item.completedBy || []).filter((id) => id !== currentParticipant.id);
+
         return {
           ...item,
-          contributions: (item.contributions || []).filter((c) => c.participantId !== currentParticipant.id),
+          assignees: nextAssignees,
+          assigneeId: nextAssignees[0]?.id,
+          assigneeName: nextAssignees[0]?.name,
+          boardGames: nextGames,
+          subItems: nextSubs,
+          contributions: nextContribs,
+          completedBy: nextCompleted,
+          isCompleted: item.type === 'shared_single' ? (nextAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0) : nextCompleted.length > 0,
         };
       }),
     }));
 
-    sendAction('update_quantity_contribution', {
+    sendAction('cancel_pledge', {
       itemId,
       participantId: currentParticipant.id,
-      participantName: currentParticipant.name,
-      quantity: 0,
     });
   };
 
@@ -802,6 +786,7 @@ export default function PartyPrepPage() {
                         onClaimSharedSingle={handleClaimSharedSingle}
                         onToggleSharedComplete={handleToggleSharedComplete}
                         onOpenPledgeModal={handleOpenPledgeModal}
+                        onCancelPledge={handleCancelPledge}
                         onDeleteItem={handleDeleteItem}
                         onEditItem={(item) => {
                           setEditItem(item);
@@ -832,6 +817,7 @@ export default function PartyPrepPage() {
                 onClaimSharedSingle={handleClaimSharedSingle}
                 onToggleSharedComplete={handleToggleSharedComplete}
                 onOpenPledgeModal={handleOpenPledgeModal}
+                onCancelPledge={handleCancelPledge}
                 onDeleteItem={handleDeleteItem}
                 onEditItem={(item) => {
                   setEditItem(item);

@@ -17,12 +17,76 @@ import confetti from 'canvas-confetti';
 
 export function getSubItemConfig(item: PartyItem) {
   const name = (item.name || '').toLowerCase();
+  if (name.includes('칵테일') || name.includes('양주') || name.includes('와인') || name.includes('위스키') || name.includes('하이볼')) {
+    return {
+      supported: true,
+      icon: '🍸',
+      title: '칵테일/주류 종류',
+      placeholder: '종류 (예: 진토닉, 모히또, 깔루아, 위스키)',
+    };
+  }
+  if (name.includes('고기') || name.includes('삼겹살') || name.includes('목살') || name.includes('소고기') || name.includes('스테이크')) {
+    return {
+      supported: true,
+      icon: '🥩',
+      title: '고기 부위/종류',
+      placeholder: '부위/종류 (예: 삼겹살, 목살, 한우 채끝)',
+    };
+  }
+  if (name.includes('소세지') || name.includes('소시지')) {
+    return {
+      supported: true,
+      icon: '🌭',
+      title: '소세지 종류',
+      placeholder: '종류 (예: 그릴소세지, 킬바사, 비엔나)',
+    };
+  }
+  if (name.includes('찌개') || name.includes('밀키트') || name.includes('탕')) {
+    return {
+      supported: true,
+      icon: '🍲',
+      title: '찌개/밀키트 종류',
+      placeholder: '메뉴 (예: 부대찌개, 김치찌개, 된장찌개)',
+    };
+  }
+  if (name.includes('맥주')) {
+    return {
+      supported: true,
+      icon: '🍺',
+      title: '맥주 종류',
+      placeholder: '맥주 종류 (예: 카스, 테라, 아사히, 켈리)',
+    };
+  }
+  if (name.includes('소주')) {
+    return {
+      supported: true,
+      icon: '🍶',
+      title: '소주 종류',
+      placeholder: '소주 종류 (예: 참이슬, 처음처럼, 새로, 진로)',
+    };
+  }
+  if (name.includes('음료') || name.includes('탄산') || name.includes('주스')) {
+    return {
+      supported: true,
+      icon: '🧃',
+      title: '음료 종류',
+      placeholder: '음료 종류 (예: 제로콜라, 사이다, 오렌지주스)',
+    };
+  }
+  if (name.includes('상비약') || name.includes('약품') || name.includes('비상약')) {
+    return {
+      supported: true,
+      icon: '🩹',
+      title: '상비약 품목',
+      placeholder: '약품 종류 (예: 타이레놀, 소화제, 밴드, 소독약)',
+    };
+  }
   if (name.includes('라면')) {
     return {
       supported: true,
       icon: '🍜',
       title: '라면 종류',
-      placeholder: '라면 종류 (예: 신라면, 너구리)',
+      placeholder: '라면 종류 (예: 신라면, 너구리, 짜파게티)',
     };
   }
   if (name.includes('과자')) {
@@ -30,7 +94,7 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🍪',
       title: '과자 종류',
-      placeholder: '과자 종류 (예: 포카칩, 홈런볼)',
+      placeholder: '과자 종류 (예: 포카칩, 홈런볼, 프링글스)',
     };
   }
   if (name.includes('마른안주') || name.includes('안주')) {
@@ -38,7 +102,7 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🦑',
       title: '마른안주 종류',
-      placeholder: '안주 종류 (예: 먹태, 육포)',
+      placeholder: '안주 종류 (예: 먹태, 육포, 오징어)',
     };
   }
   if (name.includes('보드게임') || (item.boardGames && item.boardGames.length > 0)) {
@@ -46,7 +110,7 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🎲',
       title: '보드게임',
-      placeholder: '게임명 (예: 루미큐브)',
+      placeholder: '게임명 (예: 루미큐브, 할리갈리, 뱅)',
     };
   }
   if (item.subItems && item.subItems.length > 0) {
@@ -73,6 +137,7 @@ interface ItemCardProps {
   onClaimSharedSingle: (itemId: string, participantId: string, participantName: string) => void;
   onToggleSharedComplete?: (itemId: string) => void;
   onOpenPledgeModal: (item: PartyItem) => void;
+  onCancelPledge?: (itemId: string) => void;
   onDeleteItem: (itemId: string) => void;
   onEditItem: (item: PartyItem) => void;
   onUpdateTargetQuantity?: (itemId: string, newTarget: number) => void;
@@ -88,6 +153,7 @@ export default function ItemCard({
   onTogglePersonal,
   onClaimSharedSingle,
   onOpenPledgeModal,
+  onCancelPledge,
   onDeleteItem,
   onEditItem,
   onUpdateTargetQuantity,
@@ -219,12 +285,15 @@ export default function ItemCard({
   // ==========================================
   if (item.type === 'shared_single') {
     const isBoardGame = item.name.includes('보드게임') || (item.boardGames && item.boardGames.length > 0);
+    const subItemConfig = getSubItemConfig(item);
     const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
     const boardGamesList = item.boardGames || [];
+    const subItemsList = item.subItems || [];
     const inGames = boardGamesList.some((bg) => bg.participantId === currentParticipant.id);
-    const isPledgedByMe = assignees.some((a) => a.id === currentParticipant.id) || inGames;
+    const inSubs = subItemsList.some((s) => s.participantId === currentParticipant.id);
+    const isPledgedByMe = assignees.some((a) => a.id === currentParticipant.id) || inGames || inSubs;
     const isPackedByMe = (item.completedBy || []).includes(currentParticipant.id);
-    const hasAnyPledge = assignees.length > 0 || boardGamesList.length > 0;
+    const hasAnyPledge = assignees.length > 0 || boardGamesList.length > 0 || subItemsList.length > 0;
     const isDone = isPackedByMe || (item.completedBy && item.completedBy.length > 0) || item.isCompleted;
 
     const handleClaimClick = () => {
@@ -262,6 +331,10 @@ export default function ItemCard({
               {isBoardGame && boardGamesList.length > 0 ? (
                 <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-0.5">
                   🎲 {boardGamesList.length}개
+                </span>
+              ) : subItemConfig.supported && !isBoardGame && subItemsList.length > 0 ? (
+                <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-0.5">
+                  {subItemConfig.icon} {subItemsList.length}종류
                 </span>
               ) : !hasAnyPledge ? (
                 <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-0.5">
@@ -418,6 +491,78 @@ export default function ItemCard({
               </form>
             </div>
           )}
+
+          {/* Sub-item specific registration box for 칵테일, 상비약 등 */}
+          {subItemConfig.supported && !isBoardGame && (
+            <div className="mt-2 p-2 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                <span className="flex items-center gap-1">
+                  <span>{subItemConfig.icon}</span>
+                  <span>{subItemConfig.title} ({subItemsList.length})</span>
+                </span>
+              </div>
+
+              {subItemsList.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {subItemsList.map((sub) => {
+                    const isMine = sub.participantId === currentParticipant.id;
+                    return (
+                      <span
+                        key={sub.id}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 shadow-2xs"
+                      >
+                        <span className="font-bold text-amber-800 dark:text-amber-300 truncate max-w-[70px]">
+                          {subItemConfig.icon} {sub.name}
+                        </span>
+                        <span className="text-slate-400">({sub.participantName})</span>
+                        {isMine && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveSubItem?.(item.id, sub.id)}
+                            className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 text-[10px]"
+                            title="종류 취소"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80">
+                  가져올 종류를 등록해주세요!
+                </p>
+              )}
+
+              {/* Quick Inline Sub-item Addition */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!inputSubItemName.trim()) return;
+                  triggerCelebration();
+                  onAddSubItem?.(item.id, inputSubItemName.trim(), currentParticipant.id, currentParticipant.name);
+                  setInputSubItemName('');
+                }}
+                className="flex items-center gap-1 pt-0.5"
+              >
+                <input
+                  type="text"
+                  value={inputSubItemName}
+                  onChange={(e) => setInputSubItemName(e.target.value)}
+                  placeholder={subItemConfig.placeholder}
+                  className="min-w-0 flex-1 px-2 py-1 text-[11px] rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden"
+                />
+                <button
+                  type="submit"
+                  disabled={!inputSubItemName.trim()}
+                  className="px-2 py-1 text-[11px] font-bold rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white shadow-xs transition-all active:scale-95 flex-shrink-0"
+                >
+                  + 등록
+                </button>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* Bottom Area: Action Buttons (찜하기 후 챙김 버튼 별개 표시) */}
@@ -432,7 +577,15 @@ export default function ItemCard({
                 </span>
                 <button
                   type="button"
-                  onClick={() => onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name)}
+                  onClick={() => {
+                    if (confirm(`'${item.name}' 찜하기를 취소하시겠습니까?`)) {
+                      if (onCancelPledge) {
+                        onCancelPledge(item.id);
+                      } else {
+                        onClaimSharedSingle(item.id, currentParticipant.id, currentParticipant.name);
+                      }
+                    }
+                  }}
                   className="text-slate-400 hover:text-rose-500 underline text-[10px]"
                   title="내 찜 취소"
                 >
@@ -726,18 +879,33 @@ export default function ItemCard({
       <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/70 space-y-1.5">
         {myContrib ? (
           <div className="space-y-1.5">
-            {/* 1. 찜 내역 & 수정 옵션 */}
+            {/* 1. 찜 내역 & 수정 / 취소 옵션 */}
             <div className="flex items-center justify-between text-[11px] px-0.5">
-              <span className="text-indigo-600 dark:text-indigo-400 font-bold truncate max-w-[105px]">
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold truncate max-w-[95px] sm:max-w-[120px]">
                 📌 내 찜: {myContrib.quantity}{unit}
               </span>
-              <button
-                type="button"
-                onClick={() => onOpenPledgeModal(item)}
-                className="text-indigo-600 dark:text-indigo-400 hover:underline text-[10px] font-semibold flex-shrink-0"
-              >
-                수량 수정
-              </button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onOpenPledgeModal(item)}
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline text-[10px] font-semibold"
+                >
+                  수량 수정
+                </button>
+                <span className="text-slate-300 dark:text-slate-600 text-[9px]">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`'${item.name}' 찜하기를 취소하시겠습니까?`)) {
+                      onCancelPledge?.(item.id);
+                    }
+                  }}
+                  className="text-rose-500 hover:text-rose-600 hover:underline text-[10px] font-semibold"
+                  title="내 찜 취소"
+                >
+                  찜 취소
+                </button>
+              </div>
             </div>
 
             {/* 2. 별개로 나타나는 챙김 버튼 */}
