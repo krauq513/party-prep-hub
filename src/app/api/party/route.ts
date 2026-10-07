@@ -2,10 +2,16 @@ import { NextResponse } from 'next/server';
 import { getPartyData, savePartyData, resetPartyData } from '@/lib/storage';
 import { PartyItem, Participant, CustomSubItem } from '@/types/party';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const { data, storageType } = await getPartyData();
-    return NextResponse.json({ success: true, data, storageType });
+    return NextResponse.json(
+      { success: true, data, storageType },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    );
   } catch (error) {
     console.error('Failed to get party data:', error);
     return NextResponse.json(
