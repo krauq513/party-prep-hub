@@ -10,7 +10,13 @@ export async function GET() {
     const { data, storageType } = await getPartyData();
     return NextResponse.json(
       { success: true, data, storageType },
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
     );
   } catch (error) {
     console.error('Failed to get party data:', error);
@@ -337,11 +343,21 @@ export async function POST(req: Request) {
             newContribs = newContribs.filter((c) => c.participantId !== participantId);
             const newCompletedBy = (item.completedBy || []).filter((id) => id !== participantId);
             const nextSubs = (item.subItems || []).filter((s) => s.participantId !== participantId);
+            const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+            const nextAssignees = currentAssignees.filter((a) => a.id !== participantId);
+            const nextGames = (item.boardGames || []).filter((g) => g.participantId !== participantId);
+            const currentTotal = newContribs.reduce((sum, c) => sum + c.quantity, 0);
+
             return {
               ...item,
               contributions: newContribs,
               completedBy: newCompletedBy,
               subItems: nextSubs,
+              assignees: nextAssignees,
+              assigneeId: nextAssignees[0]?.id,
+              assigneeName: nextAssignees[0]?.name,
+              boardGames: nextGames,
+              isCompleted: item.type === 'shared_quantity' ? currentTotal >= (item.targetQuantity || 1) : (nextAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0 || newCompletedBy.length > 0),
               updatedAt: new Date().toISOString(),
             };
           } else if (existingIndex >= 0) {
@@ -379,10 +395,13 @@ export async function POST(req: Request) {
             nextSubs = [...otherSubs, ...myNewSubs];
           }
 
+          const currentTotal = newContribs.reduce((sum, c) => sum + c.quantity, 0);
+
           return {
             ...item,
             contributions: newContribs,
             subItems: nextSubs,
+            isCompleted: item.type === 'shared_quantity' ? currentTotal >= (item.targetQuantity || 1) : item.isCompleted,
             updatedAt: new Date().toISOString(),
           };
         });
@@ -393,11 +412,22 @@ export async function POST(req: Request) {
         const { itemId, participantId } = payload;
         updatedData.items = updatedData.items.map((item) => {
           if (item.id !== itemId) return item;
-          const nextAssignees = (item.assignees || []).filter((a) => a.id !== participantId);
+          const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+          const nextAssignees = currentAssignees.filter((a) => a.id !== participantId);
           const nextGames = (item.boardGames || []).filter((g) => g.participantId !== participantId);
           const nextSubs = (item.subItems || []).filter((s) => s.participantId !== participantId);
           const nextContribs = (item.contributions || []).filter((c) => c.participantId !== participantId);
           const nextCompleted = (item.completedBy || []).filter((id) => id !== participantId);
+
+          let isCompleted = false;
+          if (item.type === 'personal') {
+            isCompleted = nextCompleted.length > 0;
+          } else if (item.type === 'shared_single') {
+            isCompleted = nextAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0;
+          } else if (item.type === 'shared_quantity') {
+            const currentTotal = nextContribs.reduce((sum, c) => sum + c.quantity, 0);
+            isCompleted = currentTotal >= (item.targetQuantity || 1);
+          }
 
           return {
             ...item,
@@ -408,7 +438,7 @@ export async function POST(req: Request) {
             subItems: nextSubs,
             contributions: nextContribs,
             completedBy: nextCompleted,
-            isCompleted: item.type === 'shared_single' ? (nextAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0) : nextCompleted.length > 0,
+            isCompleted,
             updatedAt: new Date().toISOString(),
           };
         });

@@ -3,9 +3,10 @@ import path from 'path';
 import { PartyData } from '@/types/party';
 import { INITIAL_PARTY_DATA } from '@/data/initialData';
 import { Redis } from '@upstash/redis';
-import { put, list } from '@vercel/blob';
+import { put, list, del } from '@vercel/blob';
 
-const BLOB_FILENAME = 'party-data-v1.json';
+const SNAPSHOT_PREFIX = 'party-snapshots/';
+const LEGACY_BLOB_FILENAME = 'party-data-v1.json';
 const REDIS_KEY = 'party_prep_hub_data_v1';
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'party-data.json');
@@ -30,10 +31,35 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
   // 1. Check Vercel Blob (Primary for Vercel production)
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
-      const { blobs } = await list({ prefix: BLOB_FILENAME });
-      if (blobs && blobs.length > 0) {
-        // Use cache-busting timestamp parameter to avoid edge CDN cache
-        const res = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: 'no-store' });
+      // Look for immutable timestamped snapshots first (guaranteed zero CDN cache lag)
+      const { blobs: snapshotBlobs } = await list({ prefix: SNAPSHOT_PREFIX });
+      let targetBlobUrl: string | null = null;
+
+      if (snapshotBlobs && snapshotBlobs.length > 0) {
+        const sorted = [...snapshotBlobs].sort(
+          (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
+        targetBlobUrl = sorted[0].url;
+      } else {
+        // Fallback to legacy single file
+        const { blobs: legacyBlobs } = await list({ prefix: LEGACY_BLOB_FILENAME });
+        if (legacyBlobs && legacyBlobs.length > 0) {
+          const sorted = [...legacyBlobs].sort(
+            (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+          );
+          targetBlobUrl = sorted[0].url;
+        }
+      }
+
+      if (targetBlobUrl) {
+        // Fetch with aggressive cache-busting headers
+        const res = await fetch(`${targetBlobUrl}?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
+        });
         if (res.ok) {
           const data: PartyData = await res.json();
           if (data && data.items) {
@@ -52,11 +78,6 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
                     }
                   }
                   boardGameItem.isCompleted = true;
-                  await put(BLOB_FILENAME, JSON.stringify(data, null, 2), {
-                    access: 'public',
-                    addRandomSuffix: false,
-                    allowOverwrite: true,
-                  });
                 }
               }
             }
@@ -67,17 +88,22 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
               cocktailItem.notes = '하이볼, 칵테일 제조용 주류/베이스 🍸 찜하기 및 종류 등록 환영!';
             }
 
+            // If in-memory data has a strictly newer timestamp, use in-memory
+            if (
+              globalForParty.partyData?.updatedAt &&
+              data.updatedAt &&
+              new Date(globalForParty.partyData.updatedAt) > new Date(data.updatedAt)
+            ) {
+              return { data: globalForParty.partyData, storageType: 'in_memory' };
+            }
+
             globalForParty.partyData = data;
             return { data, storageType: 'blob' };
           }
         }
       } else {
-        // Initialize Blob with INITIAL_PARTY_DATA (contains Lee Ah-reum's Rummikub)
-        await put(BLOB_FILENAME, JSON.stringify(INITIAL_PARTY_DATA, null, 2), {
-          access: 'public',
-          addRandomSuffix: false,
-          allowOverwrite: true,
-        });
+        // Initialize Blob with INITIAL_PARTY_DATA
+        await savePartyData(INITIAL_PARTY_DATA);
         globalForParty.partyData = INITIAL_PARTY_DATA;
         return { data: INITIAL_PARTY_DATA, storageType: 'blob' };
       }
@@ -153,11 +179,34 @@ export async function savePartyData(data: PartyData): Promise<{ success: boolean
   // 2. Save to Vercel Blob (Primary for Vercel production)
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
-      await put(BLOB_FILENAME, JSON.stringify(updatedData, null, 2), {
+      const snapshotName = `${SNAPSHOT_PREFIX}data-${Date.now()}.json`;
+      await put(snapshotName, JSON.stringify(updatedData, null, 2), {
+        access: 'public',
+        addRandomSuffix: false,
+        cacheControlMaxAge: 0,
+      });
+
+      // Keep legacy file updated with cacheControlMaxAge: 0 for backward compatibility
+      put(LEGACY_BLOB_FILENAME, JSON.stringify(updatedData, null, 2), {
         access: 'public',
         addRandomSuffix: false,
         allowOverwrite: true,
-      });
+        cacheControlMaxAge: 0,
+      }).catch(() => {});
+
+      // Asynchronously prune older snapshots (retain newest 5)
+      list({ prefix: SNAPSHOT_PREFIX })
+        .then(({ blobs }) => {
+          if (blobs && blobs.length > 5) {
+            const sorted = [...blobs].sort(
+              (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+            );
+            const toDelete = sorted.slice(5).map((b) => b.url);
+            if (toDelete.length > 0) del(toDelete).catch(() => {});
+          }
+        })
+        .catch(() => {});
+
       return { success: true, storageType: 'blob' };
     } catch (err) {
       console.error('Vercel Blob save error:', err);
@@ -190,17 +239,7 @@ export async function savePartyData(data: PartyData): Promise<{ success: boolean
 }
 
 export async function resetPartyData(): Promise<PartyData> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    try {
-      await put(BLOB_FILENAME, JSON.stringify(INITIAL_PARTY_DATA, null, 2), {
-        access: 'public',
-        addRandomSuffix: false,
-        allowOverwrite: true,
-      });
-    } catch (err) {
-      console.error('Blob reset error:', err);
-    }
-  }
+  await savePartyData(INITIAL_PARTY_DATA);
 
   const redis = getRedisClient();
   if (redis) {

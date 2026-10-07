@@ -308,11 +308,22 @@ export default function PartyPrepPage() {
       ...prev,
       items: prev.items.map((item) => {
         if (item.id !== itemId) return item;
-        const nextAssignees = (item.assignees || []).filter((a) => a.id !== currentParticipant.id);
+        const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+        const nextAssignees = currentAssignees.filter((a) => a.id !== currentParticipant.id);
         const nextGames = (item.boardGames || []).filter((g) => g.participantId !== currentParticipant.id);
         const nextSubs = (item.subItems || []).filter((s) => s.participantId !== currentParticipant.id);
         const nextContribs = (item.contributions || []).filter((c) => c.participantId !== currentParticipant.id);
         const nextCompleted = (item.completedBy || []).filter((id) => id !== currentParticipant.id);
+
+        let isCompleted = false;
+        if (item.type === 'personal') {
+          isCompleted = nextCompleted.length > 0;
+        } else if (item.type === 'shared_single') {
+          isCompleted = nextAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0;
+        } else if (item.type === 'shared_quantity') {
+          const currentTotal = nextContribs.reduce((sum, c) => sum + c.quantity, 0);
+          isCompleted = currentTotal >= (item.targetQuantity || 1);
+        }
 
         return {
           ...item,
@@ -323,7 +334,7 @@ export default function PartyPrepPage() {
           subItems: nextSubs,
           contributions: nextContribs,
           completedBy: nextCompleted,
-          isCompleted: item.type === 'shared_single' ? (nextAssignees.length > 0 || nextGames.length > 0 || nextSubs.length > 0) : nextCompleted.length > 0,
+          isCompleted,
         };
       }),
     }));

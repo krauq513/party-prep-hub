@@ -102,7 +102,11 @@ export default function PledgeModal({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (quantity <= 0) return;
+    if (quantity <= 0) {
+      onCancelPledge(item.id);
+      onClose();
+      return;
+    }
 
     try {
       confetti({
