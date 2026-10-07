@@ -32,7 +32,8 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
     try {
       const { blobs } = await list({ prefix: BLOB_FILENAME });
       if (blobs && blobs.length > 0) {
-        const res = await fetch(blobs[0].url, { cache: 'no-store' });
+        // Use cache-busting timestamp parameter to avoid edge CDN cache
+        const res = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: 'no-store' });
         if (res.ok) {
           const data: PartyData = await res.json();
           if (data && data.items) {
@@ -54,6 +55,7 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
                   await put(BLOB_FILENAME, JSON.stringify(data, null, 2), {
                     access: 'public',
                     addRandomSuffix: false,
+                    allowOverwrite: true,
                   });
                 }
               }
@@ -67,6 +69,7 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
         await put(BLOB_FILENAME, JSON.stringify(INITIAL_PARTY_DATA, null, 2), {
           access: 'public',
           addRandomSuffix: false,
+          allowOverwrite: true,
         });
         globalForParty.partyData = INITIAL_PARTY_DATA;
         return { data: INITIAL_PARTY_DATA, storageType: 'blob' };
@@ -146,6 +149,7 @@ export async function savePartyData(data: PartyData): Promise<{ success: boolean
       await put(BLOB_FILENAME, JSON.stringify(updatedData, null, 2), {
         access: 'public',
         addRandomSuffix: false,
+        allowOverwrite: true,
       });
       return { success: true, storageType: 'blob' };
     } catch (err) {
@@ -184,6 +188,7 @@ export async function resetPartyData(): Promise<PartyData> {
       await put(BLOB_FILENAME, JSON.stringify(INITIAL_PARTY_DATA, null, 2), {
         access: 'public',
         addRandomSuffix: false,
+        allowOverwrite: true,
       });
     } catch (err) {
       console.error('Blob reset error:', err);
