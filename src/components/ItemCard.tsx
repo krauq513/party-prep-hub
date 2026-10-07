@@ -306,16 +306,16 @@ export default function ItemCard({
   // 2. SHARED SINGLE ITEM (공용 단일 품목 - 여러 명 찜 가능 & 보드게임 이름 등록)
   // ==========================================
   if (item.type === 'shared_single') {
-    const isBoardGame = item.name.includes('보드게임') || (item.boardGames && item.boardGames.length > 0);
+    const isBoardGame = item.name.includes('보드게임');
     const subItemConfig = getSubItemConfig(item);
     const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
-    const boardGamesList = item.boardGames || [];
-    const subItemsList = item.subItems || [];
+    const boardGamesList = isBoardGame ? (item.boardGames || []) : [];
+    const subItemsList = !isBoardGame ? (item.subItems || []) : [];
     const inGames = boardGamesList.some((bg) => bg.participantId === currentParticipant.id);
     const inSubs = subItemsList.some((s) => s.participantId === currentParticipant.id);
     const isPledgedByMe = assignees.some((a) => a.id === currentParticipant.id) || inGames || inSubs;
     const isPackedByMe = (item.completedBy || []).includes(currentParticipant.id);
-    const hasAnyPledge = assignees.length > 0 || boardGamesList.length > 0 || subItemsList.length > 0;
+    const hasAnyPledge = assignees.length > 0 || (isBoardGame ? boardGamesList.length > 0 : subItemsList.length > 0);
     const isDone = isPackedByMe || (item.completedBy && item.completedBy.length > 0) || item.isCompleted;
 
     const handleClaimClick = () => {

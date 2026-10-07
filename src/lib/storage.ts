@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { PartyData } from '@/types/party';
+import { PartyData, CustomSubItem } from '@/types/party';
 import { INITIAL_PARTY_DATA } from '@/data/initialData';
 import { Redis } from '@upstash/redis';
 import { put, list, del } from '@vercel/blob';
@@ -87,6 +87,28 @@ export async function getPartyData(): Promise<{ data: PartyData; storageType: 'b
               cocktailItem.name = '칵테일';
               cocktailItem.notes = '하이볼, 칵테일 제조용 주류/베이스 🍸 찜하기 및 종류 등록 환영!';
             }
+
+            // Clean up any stray boardGames on non-board-game items (e.g. 칵테일) and migrate to subItems
+            data.items = data.items.map((i) => {
+              if (!i.name.includes('보드게임') && i.boardGames && i.boardGames.length > 0) {
+                const existingSubNames = new Set((i.subItems || []).map((s) => s.name.toLowerCase()));
+                const subsFromGames: CustomSubItem[] = i.boardGames
+                  .filter((bg) => !existingSubNames.has(bg.gameName.toLowerCase()))
+                  .map((bg) => ({
+                    id: bg.id,
+                    name: bg.gameName,
+                    participantId: bg.participantId,
+                    participantName: bg.participantName,
+                    createdAt: bg.createdAt,
+                  }));
+                return {
+                  ...i,
+                  subItems: [...(i.subItems || []), ...subsFromGames],
+                  boardGames: [],
+                };
+              }
+              return i;
+            });
 
             // If in-memory data has a strictly newer timestamp, use in-memory
             if (

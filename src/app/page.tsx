@@ -451,8 +451,8 @@ export default function PartyPrepPage() {
         }
 
         // If board game, also sync boardGames
-        let nextGames = item.boardGames || [];
-        if (item.name.includes('보드게임') || item.boardGames) {
+        let nextGames = item.name.includes('보드게임') ? (item.boardGames || []) : [];
+        if (item.name.includes('보드게임')) {
           const gamesToAdd = newSubs.map((ns) => ({
             id: ns.id,
             gameName: ns.name,
