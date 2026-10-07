@@ -29,6 +29,14 @@ export interface BoardGameItem {
   createdAt: string;
 }
 
+export interface CustomSubItem {
+  id: string;
+  name: string;
+  participantId: string;
+  participantName: string;
+  createdAt: string;
+}
+
 export interface PartyItem {
   id: string;
   name: string;
@@ -46,6 +54,9 @@ export interface PartyItem {
 
   // For board games: list of games brought by participants
   boardGames?: BoardGameItem[];
+
+  // For items with custom sub-items (e.g. 라면, 과자, 마른안주, etc.)
+  subItems?: CustomSubItem[];
   
   // For 'shared_quantity' items:
   targetQuantity?: number;

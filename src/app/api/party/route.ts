@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPartyData, savePartyData, resetPartyData } from '@/lib/storage';
-import { PartyItem, Participant } from '@/types/party';
+import { PartyItem, Participant, CustomSubItem } from '@/types/party';
 
 export async function GET() {
   try {
@@ -88,6 +88,136 @@ export async function POST(req: Request) {
         break;
       }
 
+      case 'add_sub_item': {
+        const { itemId, name, participantId, participantName } = payload;
+        const subName = (name || '').trim();
+        if (!subName) break;
+
+        updatedData.items = updatedData.items.map((item) => {
+          if (item.id !== itemId) return item;
+          const currentSubs = item.subItems || [];
+          const newSub: CustomSubItem = {
+            id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            name: subName,
+            participantId,
+            participantName,
+            createdAt: new Date().toISOString(),
+          };
+          const nextSubs = [...currentSubs, newSub];
+
+          // If shared_quantity, also ensure contribution quantity >= mySubCount
+          let nextContribs = item.contributions || [];
+          if (item.type === 'shared_quantity') {
+            const mySubCount = nextSubs.filter((s) => s.participantId === participantId).length;
+            const existingIdx = nextContribs.findIndex((c) => c.participantId === participantId);
+            if (existingIdx >= 0) {
+              nextContribs = [...nextContribs];
+              nextContribs[existingIdx] = {
+                ...nextContribs[existingIdx],
+                quantity: Math.max(nextContribs[existingIdx].quantity, mySubCount),
+              };
+            } else {
+              nextContribs = [
+                ...nextContribs,
+                {
+                  participantId,
+                  participantName,
+                  quantity: mySubCount,
+                },
+              ];
+            }
+          }
+
+          // If shared_single, ensure participant is in assignees
+          let nextAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+          if (item.type === 'shared_single') {
+            if (!nextAssignees.some((a) => a.id === participantId)) {
+              nextAssignees = [...nextAssignees, { id: participantId, name: participantName }];
+            }
+          }
+
+          // If board game, also sync boardGames
+          let nextGames = item.boardGames || [];
+          if (item.name.includes('보드게임') || item.boardGames) {
+            nextGames = [
+              ...nextGames,
+              {
+                id: newSub.id,
+                gameName: newSub.name,
+                participantId,
+                participantName,
+                createdAt: newSub.createdAt,
+              },
+            ];
+          }
+
+          return {
+            ...item,
+            subItems: nextSubs,
+            boardGames: nextGames,
+            contributions: nextContribs,
+            assignees: nextAssignees,
+            assigneeId: nextAssignees[0]?.id,
+            assigneeName: nextAssignees[0]?.name,
+            isCompleted: item.type === 'shared_single' ? true : item.isCompleted,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        break;
+      }
+
+      case 'remove_sub_item': {
+        const { itemId, subItemId } = payload;
+        updatedData.items = updatedData.items.map((item) => {
+          if (item.id !== itemId) return item;
+          const prevSubs = item.subItems || [];
+          const nextSubs = prevSubs.filter((s) => s.id !== subItemId);
+          const deletedSub = prevSubs.find((s) => s.id === subItemId);
+
+          let nextContribs = item.contributions || [];
+          if (deletedSub && item.type === 'shared_quantity') {
+            const pId = deletedSub.participantId;
+            const remainingCount = nextSubs.filter((s) => s.participantId === pId).length;
+            const prevCount = prevSubs.filter((s) => s.participantId === pId).length;
+            const existing = nextContribs.find((c) => c.participantId === pId);
+            if (existing && existing.quantity <= prevCount) {
+              if (remainingCount === 0) {
+                nextContribs = nextContribs.filter((c) => c.participantId !== pId);
+              } else {
+                nextContribs = nextContribs.map((c) =>
+                  c.participantId === pId ? { ...c, quantity: remainingCount } : c
+                );
+              }
+            }
+          }
+
+          const nextGames = (item.boardGames || []).filter((g) => g.id !== subItemId);
+
+          let nextAssignees = item.assignees || [];
+          if (item.type === 'shared_single' && deletedSub) {
+            const pId = deletedSub.participantId;
+            const hasOtherSubs = nextSubs.some((s) => s.participantId === pId);
+            const hasOtherGames = nextGames.some((g) => g.participantId === pId);
+            if (!hasOtherSubs && !hasOtherGames) {
+              nextAssignees = nextAssignees.filter((a) => a.id !== pId);
+            }
+          }
+
+          return {
+            ...item,
+            subItems: nextSubs,
+            boardGames: nextGames,
+            contributions: nextContribs,
+            assignees: nextAssignees,
+            assigneeId: nextAssignees[0]?.id,
+            assigneeName: nextAssignees[0]?.name,
+            isCompleted: item.type === 'shared_single' ? (nextAssignees.length > 0 || nextGames.length > 0) : item.isCompleted,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        break;
+      }
+
       case 'add_board_game': {
         const { itemId, gameName, participantId, participantName } = payload;
         updatedData.items = updatedData.items.map((item) => {
@@ -102,6 +232,16 @@ export async function POST(req: Request) {
           };
           const nextGames = [...currentGames, newGame];
 
+          const currentSubs = item.subItems || [];
+          const newSub: CustomSubItem = {
+            id: newGame.id,
+            name: newGame.gameName,
+            participantId,
+            participantName,
+            createdAt: newGame.createdAt,
+          };
+          const nextSubs = [...currentSubs, newSub];
+
           const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
           const hasAssignee = currentAssignees.some((a) => a.id === participantId);
           const nextAssignees = hasAssignee
@@ -111,6 +251,7 @@ export async function POST(req: Request) {
           return {
             ...item,
             boardGames: nextGames,
+            subItems: nextSubs,
             assignees: nextAssignees,
             assigneeId: nextAssignees[0]?.id,
             assigneeName: nextAssignees[0]?.name,
@@ -127,6 +268,7 @@ export async function POST(req: Request) {
           if (item.id !== itemId) return item;
           const currentGames = item.boardGames || [];
           const nextGames = currentGames.filter((g) => g.id !== gameId);
+          const nextSubs = (item.subItems || []).filter((s) => s.id !== gameId);
 
           const remainingParticipantIds = new Set(nextGames.map((g) => g.participantId));
           const currentAssignees = item.assignees || [];
@@ -135,6 +277,7 @@ export async function POST(req: Request) {
           return {
             ...item,
             boardGames: nextGames,
+            subItems: nextSubs,
             assignees: nextAssignees,
             assigneeId: nextAssignees[0]?.id,
             assigneeName: nextAssignees[0]?.name,

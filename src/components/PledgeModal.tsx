@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PartyItem, Participant } from '@/types/party';
+import { getSubItemConfig } from '@/components/ItemCard';
 import { X, Trash2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -57,6 +58,17 @@ export default function PledgeModal({
   const currentTotal = contributions.reduce((acc, c) => acc + c.quantity, 0);
   const myContrib = contributions.find((c) => c.participantId === currentParticipant.id);
   const remaining = Math.max(0, target - (currentTotal - (myContrib?.quantity || 0)));
+  const subConfig = getSubItemConfig(item);
+
+  let currentNotePresets = NOTE_PRESETS;
+  const itemName = (item.name || '').toLowerCase();
+  if (itemName.includes('라면')) {
+    currentNotePresets = ['신라면', '진라면', '너구리', '짜파게티', '불닭', ...NOTE_PRESETS];
+  } else if (itemName.includes('과자')) {
+    currentNotePresets = ['포카칩', '새우깡', '홈런볼', '프링글스', '먹태깡', ...NOTE_PRESETS];
+  } else if (itemName.includes('마른안주') || itemName.includes('안주')) {
+    currentNotePresets = ['먹태', '육포', '오징어', '쥐포', '견과류', ...NOTE_PRESETS];
+  }
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +121,7 @@ export default function PledgeModal({
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-5">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center font-bold text-2xl shadow-md shadow-orange-500/20">
-            🛒
+            {subConfig.supported && subConfig.icon ? subConfig.icon : '🛒'}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
@@ -127,7 +139,7 @@ export default function PledgeModal({
         </div>
 
         {/* Current status info pill */}
-        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 mb-5">
+        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 mb-4">
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500 dark:text-slate-400">전체 목표 수량</span>
             <span className="font-bold text-slate-900 dark:text-white">{target.toLocaleString()}{unit}</span>
@@ -143,6 +155,35 @@ export default function PledgeModal({
             <span className="font-extrabold text-amber-600 dark:text-amber-400">{remaining.toLocaleString()}{unit}</span>
           </div>
         </div>
+
+        {/* Sub-item preview if supported */}
+        {subConfig.supported && (
+          <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 mb-4 space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-bold text-amber-900 dark:text-amber-200">
+              <span className="flex items-center gap-1">
+                <span>{subConfig.icon}</span>
+                <span>등록된 {subConfig.title} ({(item.subItems || []).length}개)</span>
+              </span>
+            </div>
+            {(item.subItems || []).length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {(item.subItems || []).map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 font-medium text-amber-800 dark:text-amber-300 shadow-2xs"
+                  >
+                    <span>{subConfig.icon} {s.name}</span>
+                    <span className="text-slate-400 text-[10px]">({s.participantName})</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                아직 등록된 종류가 없습니다. 카드에서 세부 종류를 추가하거나 아래 메모에 적어주세요!
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSave} className="space-y-4">
@@ -208,19 +249,19 @@ export default function PledgeModal({
           {/* Note Input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              준비 방법 / 메모 (선택)
+              {subConfig.supported ? `${subConfig.title} / 메모 (선택)` : '준비 방법 / 메모 (선택)'}
             </label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="예: 집에서 가져옴, 마트 구매 예정, 쿠팡 주문 등"
+              placeholder={subConfig.supported ? `예: ${subConfig.placeholder}` : "예: 집에서 가져옴, 마트 구매 예정, 쿠팡 주문 등"}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
             />
 
             {/* Quick Note Presets */}
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              {NOTE_PRESETS.map((preset) => (
+              {currentNotePresets.map((preset) => (
                 <button
                   key={preset}
                   type="button"

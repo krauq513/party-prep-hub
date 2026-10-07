@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PartyData, PartyItem, Participant, FilterCategory, FilterType, FilterStatus, BoardGameItem, SingleAssignee } from '@/types/party';
+import { PartyData, PartyItem, Participant, FilterCategory, FilterType, FilterStatus, BoardGameItem, SingleAssignee, CustomSubItem } from '@/types/party';
 import { INITIAL_PARTY_DATA, INITIAL_PARTICIPANTS } from '@/data/initialData';
 import Header from '@/components/Header';
 import StatsDashboard from '@/components/StatsDashboard';
@@ -96,6 +96,13 @@ export default function PartyPrepPage() {
                       nextGames = [...nextGames, ...added];
                     }
 
+                    let nextSubItems = srvItem.subItems || [];
+                    if (localItem.subItems && localItem.subItems.length > 0) {
+                      const srvSubIds = new Set(nextSubItems.map((s) => s.id));
+                      const addedSub = localItem.subItems.filter((s: CustomSubItem) => !srvSubIds.has(s.id));
+                      nextSubItems = [...nextSubItems, ...addedSub];
+                    }
+
                     let nextAssignees = srvItem.assignees || [];
                     if (localItem.assignees && localItem.assignees.length > 0) {
                       const srvAIds = new Set(nextAssignees.map((a) => a.id));
@@ -110,6 +117,7 @@ export default function PartyPrepPage() {
                     return {
                       ...srvItem,
                       boardGames: nextGames,
+                      subItems: nextSubItems,
                       assignees: nextAssignees,
                       completedBy: nextCompleted,
                       isCompleted: srvItem.isCompleted || localItem.isCompleted || nextCompleted.length > 0,
@@ -429,6 +437,141 @@ export default function PartyPrepPage() {
     sendAction('remove_board_game', { itemId, gameId });
   };
 
+  const handleSaveSubItem = (itemId: string, name: string, participantId: string, participantName: string) => {
+    const subName = (name || '').trim();
+    if (!subName) return;
+
+    const newSub: CustomSubItem = {
+      id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: subName,
+      participantId,
+      participantName,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const currentSubs = item.subItems || [];
+        const nextSubs = [...currentSubs, newSub];
+
+        // If shared_quantity, also ensure contribution quantity >= mySubCount
+        let nextContribs = item.contributions || [];
+        if (item.type === 'shared_quantity') {
+          const mySubCount = nextSubs.filter((s) => s.participantId === participantId).length;
+          const existingIdx = nextContribs.findIndex((c) => c.participantId === participantId);
+          if (existingIdx >= 0) {
+            nextContribs = [...nextContribs];
+            nextContribs[existingIdx] = {
+              ...nextContribs[existingIdx],
+              quantity: Math.max(nextContribs[existingIdx].quantity, mySubCount),
+            };
+          } else {
+            nextContribs = [
+              ...nextContribs,
+              {
+                participantId,
+                participantName,
+                quantity: mySubCount,
+              },
+            ];
+          }
+        }
+
+        // If board game, also sync boardGames
+        let nextGames = item.boardGames || [];
+        if (item.name.includes('보드게임') || item.boardGames) {
+          nextGames = [
+            ...nextGames,
+            {
+              id: newSub.id,
+              gameName: newSub.name,
+              participantId,
+              participantName,
+              createdAt: newSub.createdAt,
+            },
+          ];
+        }
+
+        // If shared_single, ensure participant is in assignees
+        let nextAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
+        if (item.type === 'shared_single') {
+          if (!nextAssignees.some((a) => a.id === participantId)) {
+            nextAssignees = [...nextAssignees, { id: participantId, name: participantName }];
+          }
+        }
+
+        return {
+          ...item,
+          subItems: nextSubs,
+          boardGames: nextGames,
+          contributions: nextContribs,
+          assignees: nextAssignees,
+          assigneeId: nextAssignees[0]?.id,
+          assigneeName: nextAssignees[0]?.name,
+          isCompleted: item.type === 'shared_single' ? true : item.isCompleted,
+        };
+      }),
+    }));
+
+    sendAction('add_sub_item', { itemId, name: subName, participantId, participantName });
+  };
+
+  const handleRemoveSubItem = (itemId: string, subId: string) => {
+    setPartyData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const prevSubs = item.subItems || [];
+        const nextSubs = prevSubs.filter((s) => s.id !== subId);
+        const deletedSub = prevSubs.find((s) => s.id === subId);
+
+        let nextContribs = item.contributions || [];
+        if (deletedSub && item.type === 'shared_quantity') {
+          const pId = deletedSub.participantId;
+          const remainingCount = nextSubs.filter((s) => s.participantId === pId).length;
+          const prevCount = prevSubs.filter((s) => s.participantId === pId).length;
+          const existing = nextContribs.find((c) => c.participantId === pId);
+          if (existing && existing.quantity <= prevCount) {
+            if (remainingCount === 0) {
+              nextContribs = nextContribs.filter((c) => c.participantId !== pId);
+            } else {
+              nextContribs = nextContribs.map((c) =>
+                c.participantId === pId ? { ...c, quantity: remainingCount } : c
+              );
+            }
+          }
+        }
+
+        const nextGames = (item.boardGames || []).filter((g) => g.id !== subId);
+
+        let nextAssignees = item.assignees || [];
+        if (item.type === 'shared_single' && deletedSub) {
+          const pId = deletedSub.participantId;
+          const hasOtherSubs = nextSubs.some((s) => s.participantId === pId);
+          const hasOtherGames = nextGames.some((g) => g.participantId === pId);
+          if (!hasOtherSubs && !hasOtherGames) {
+            nextAssignees = nextAssignees.filter((a) => a.id !== pId);
+          }
+        }
+
+        return {
+          ...item,
+          subItems: nextSubs,
+          boardGames: nextGames,
+          contributions: nextContribs,
+          assignees: nextAssignees,
+          assigneeId: nextAssignees[0]?.id,
+          assigneeName: nextAssignees[0]?.name,
+          isCompleted: item.type === 'shared_single' ? (nextAssignees.length > 0 || nextGames.length > 0) : item.isCompleted,
+        };
+      }),
+    }));
+
+    sendAction('remove_sub_item', { itemId, subItemId: subId });
+  };
+
   const handleAddParticipant = (name: string, avatar: string) => {
     sendAction('add_participant', {
       name,
@@ -444,9 +587,14 @@ export default function PartyPrepPage() {
       const assignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
       const inAssignees = assignees.some((a) => a.id === currentParticipant.id);
       const inGames = (item.boardGames || []).some((bg) => bg.participantId === currentParticipant.id);
-      return inAssignees || inGames;
+      const inSubs = (item.subItems || []).some((s) => s.participantId === currentParticipant.id);
+      return inAssignees || inGames || inSubs;
     }
-    if (item.type === 'shared_quantity') return (item.contributions || []).some((c) => c.participantId === currentParticipant.id);
+    if (item.type === 'shared_quantity') {
+      const inContribs = (item.contributions || []).some((c) => c.participantId === currentParticipant.id);
+      const inSubs = (item.subItems || []).some((s) => s.participantId === currentParticipant.id);
+      return inContribs || inSubs;
+    }
     return false;
   }).length;
 
@@ -662,6 +810,8 @@ export default function PartyPrepPage() {
                         onUpdateTargetQuantity={handleUpdateTargetQuantity}
                         onAddBoardGame={handleSaveBoardGame}
                         onRemoveBoardGame={handleRemoveBoardGame}
+                        onAddSubItem={handleSaveSubItem}
+                        onRemoveSubItem={handleRemoveSubItem}
                       />
                     ))}
                   </div>
@@ -690,6 +840,8 @@ export default function PartyPrepPage() {
                 onUpdateTargetQuantity={handleUpdateTargetQuantity}
                 onAddBoardGame={handleSaveBoardGame}
                 onRemoveBoardGame={handleRemoveBoardGame}
+                onAddSubItem={handleSaveSubItem}
+                onRemoveSubItem={handleRemoveSubItem}
               />
             ))}
           </div>

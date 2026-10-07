@@ -15,6 +15,56 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+export function getSubItemConfig(item: PartyItem) {
+  const name = (item.name || '').toLowerCase();
+  if (name.includes('라면')) {
+    return {
+      supported: true,
+      icon: '🍜',
+      title: '라면 종류',
+      placeholder: '라면 종류 (예: 신라면, 너구리)',
+    };
+  }
+  if (name.includes('과자')) {
+    return {
+      supported: true,
+      icon: '🍪',
+      title: '과자 종류',
+      placeholder: '과자 종류 (예: 포카칩, 홈런볼)',
+    };
+  }
+  if (name.includes('마른안주') || name.includes('안주')) {
+    return {
+      supported: true,
+      icon: '🦑',
+      title: '마른안주 종류',
+      placeholder: '안주 종류 (예: 먹태, 육포)',
+    };
+  }
+  if (name.includes('보드게임') || (item.boardGames && item.boardGames.length > 0)) {
+    return {
+      supported: true,
+      icon: '🎲',
+      title: '보드게임',
+      placeholder: '게임명 (예: 루미큐브)',
+    };
+  }
+  if (item.subItems && item.subItems.length > 0) {
+    return {
+      supported: true,
+      icon: '📝',
+      title: '세부 품목',
+      placeholder: '품목명 입력',
+    };
+  }
+  return {
+    supported: false,
+    icon: '',
+    title: '',
+    placeholder: '',
+  };
+}
+
 interface ItemCardProps {
   item: PartyItem;
   participants?: Participant[];
@@ -28,6 +78,8 @@ interface ItemCardProps {
   onUpdateTargetQuantity?: (itemId: string, newTarget: number) => void;
   onAddBoardGame?: (itemId: string, gameName: string, participantId: string, participantName: string) => void;
   onRemoveBoardGame?: (itemId: string, gameId: string) => void;
+  onAddSubItem?: (itemId: string, name: string, participantId: string, participantName: string) => void;
+  onRemoveSubItem?: (itemId: string, subId: string) => void;
 }
 
 export default function ItemCard({
@@ -41,8 +93,11 @@ export default function ItemCard({
   onUpdateTargetQuantity,
   onAddBoardGame,
   onRemoveBoardGame,
+  onAddSubItem,
+  onRemoveSubItem,
 }: ItemCardProps) {
   const [inputGameName, setInputGameName] = useState('');
+  const [inputSubItemName, setInputSubItemName] = useState('');
 
   const triggerCelebration = () => {
     try {
@@ -437,6 +492,8 @@ export default function ItemCard({
   const isPackedByMe = (item.completedBy || []).includes(currentParticipant.id);
   const isFulfilled = currentTotal >= target;
   const percent = Math.min(Math.round((currentTotal / target) * 100), 100);
+  const subItemConfig = getSubItemConfig(item);
+  const subItemsList = item.subItems || [];
 
   return (
     <div className={`p-3 sm:p-4 rounded-2xl border transition-all flex flex-col justify-between h-full ${
@@ -455,6 +512,11 @@ export default function ItemCard({
             <span className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
               수량
             </span>
+            {subItemConfig.supported && subItemsList.length > 0 && (
+              <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 flex items-center gap-0.5">
+                {subItemConfig.icon} {subItemsList.length}종류
+              </span>
+            )}
             {isPackedByMe ? (
               <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-0.5">
                 <Check className="w-2.5 h-2.5" /> 내 찜 챙김!
@@ -586,6 +648,78 @@ export default function ItemCard({
             })
           )}
         </div>
+
+        {/* Sub-item specific registration box for 라면, 과자, 마른안주 */}
+        {subItemConfig.supported && (
+          <div className="mt-2.5 p-2 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 dark:text-amber-200">
+              <span className="flex items-center gap-1">
+                <span>{subItemConfig.icon}</span>
+                <span>{subItemConfig.title} ({subItemsList.length})</span>
+              </span>
+            </div>
+
+            {subItemsList.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {subItemsList.map((sub) => {
+                  const isMine = sub.participantId === currentParticipant.id;
+                  return (
+                    <span
+                      key={sub.id}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[10px] bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 shadow-2xs"
+                    >
+                      <span className="font-bold text-amber-900 dark:text-amber-200 truncate max-w-[70px]">
+                        {subItemConfig.icon} {sub.name}
+                      </span>
+                      <span className="text-slate-400">({sub.participantName})</span>
+                      {isMine && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveSubItem?.(item.id, sub.id)}
+                          className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 text-[10px]"
+                          title="항목 취소"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80">
+                가져올 종류를 등록해주세요!
+              </p>
+            )}
+
+            {/* Quick Inline Sub-item Addition */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!inputSubItemName.trim()) return;
+                triggerCelebration();
+                onAddSubItem?.(item.id, inputSubItemName.trim(), currentParticipant.id, currentParticipant.name);
+                setInputSubItemName('');
+              }}
+              className="flex items-center gap-1 pt-0.5"
+            >
+              <input
+                type="text"
+                value={inputSubItemName}
+                onChange={(e) => setInputSubItemName(e.target.value)}
+                placeholder={subItemConfig.placeholder}
+                className="min-w-0 flex-1 px-2 py-1 text-[11px] rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden"
+              />
+              <button
+                type="submit"
+                disabled={!inputSubItemName.trim()}
+                className="px-2 py-1 text-[11px] font-bold rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white shadow-xs transition-all active:scale-95 flex-shrink-0"
+              >
+                + 등록
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* Main Action Bar (찜하기 후 챙김 버튼 별개 표시) */}
