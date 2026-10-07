@@ -15,14 +15,23 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export function getSubItemConfig(item: PartyItem) {
+export interface SubItemConfig {
+  supported: boolean;
+  icon: string;
+  title: string;
+  placeholder: string;
+  presets: string[];
+}
+
+export function getSubItemConfig(item: PartyItem): SubItemConfig {
   const name = (item.name || '').toLowerCase();
   if (name.includes('칵테일') || name.includes('양주') || name.includes('와인') || name.includes('위스키') || name.includes('하이볼')) {
     return {
       supported: true,
       icon: '🍸',
       title: '칵테일/주류 종류',
-      placeholder: '종류 (예: 진토닉, 모히또, 깔루아, 위스키)',
+      placeholder: '종류 (쉼표로 여러 개 가능)',
+      presets: ['진토닉', '모히또', '하이볼', '깔루아밀크', '위스키', '잭콕', '말리부오렌지'],
     };
   }
   if (name.includes('고기') || name.includes('삼겹살') || name.includes('목살') || name.includes('소고기') || name.includes('스테이크')) {
@@ -30,7 +39,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🥩',
       title: '고기 부위/종류',
-      placeholder: '부위/종류 (예: 삼겹살, 목살, 한우 채끝)',
+      placeholder: '부위/종류 (쉼표로 여러 개 가능)',
+      presets: ['삼겹살', '목살', '소고기/한우', '항정살', '등갈비', '우삼겹'],
     };
   }
   if (name.includes('소세지') || name.includes('소시지')) {
@@ -38,7 +48,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🌭',
       title: '소세지 종류',
-      placeholder: '종류 (예: 그릴소세지, 킬바사, 비엔나)',
+      placeholder: '종류 (쉼표로 여러 개 가능)',
+      presets: ['그릴소세지', '킬바사', '프랑크소시지', '칼집비엔나', '닭가슴살소세지'],
     };
   }
   if (name.includes('찌개') || name.includes('밀키트') || name.includes('탕')) {
@@ -46,7 +57,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🍲',
       title: '찌개/밀키트 종류',
-      placeholder: '메뉴 (예: 부대찌개, 김치찌개, 된장찌개)',
+      placeholder: '메뉴 (쉼표로 여러 개 가능)',
+      presets: ['부대찌개', '돼지김치찌개', '우렁된장찌개', '어묵탕', '밀푀유나베'],
     };
   }
   if (name.includes('맥주')) {
@@ -54,7 +66,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🍺',
       title: '맥주 종류',
-      placeholder: '맥주 종류 (예: 카스, 테라, 아사히, 켈리)',
+      placeholder: '맥주 종류 (쉼표로 여러 개 가능)',
+      presets: ['카스', '테라', '켈리', '아사히', '칭따오', '버드와이저', '하이네켄'],
     };
   }
   if (name.includes('소주')) {
@@ -62,7 +75,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🍶',
       title: '소주 종류',
-      placeholder: '소주 종류 (예: 참이슬, 처음처럼, 새로, 진로)',
+      placeholder: '소주 종류 (쉼표로 여러 개 가능)',
+      presets: ['참이슬', '처음처럼', '새로(제로)', '진로이즈백', '새로 살구', '청하'],
     };
   }
   if (name.includes('음료') || name.includes('탄산') || name.includes('주스')) {
@@ -70,7 +84,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🧃',
       title: '음료 종류',
-      placeholder: '음료 종류 (예: 제로콜라, 사이다, 오렌지주스)',
+      placeholder: '음료 종류 (쉼표로 여러 개 가능)',
+      presets: ['제로콜라', '코카콜라', '칠성사이다', '토닉워터', '환타', '오렌지주스'],
     };
   }
   if (name.includes('상비약') || name.includes('약품') || name.includes('비상약')) {
@@ -78,7 +93,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🩹',
       title: '상비약 품목',
-      placeholder: '약품 종류 (예: 타이레놀, 소화제, 밴드, 소독약)',
+      placeholder: '약품 종류 (쉼표로 여러 개 가능)',
+      presets: ['타이레놀/진통제', '소화제', '대일밴드', '소독약', '후시딘/연고', '파스'],
     };
   }
   if (name.includes('라면')) {
@@ -86,7 +102,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🍜',
       title: '라면 종류',
-      placeholder: '라면 종류 (예: 신라면, 너구리, 짜파게티)',
+      placeholder: '라면 종류 (쉼표로 여러 개 가능)',
+      presets: ['신라면', '너구리', '짜파게티', '진라면', '불닭볶음면', '안성탕면', '비빔면'],
     };
   }
   if (name.includes('과자')) {
@@ -94,7 +111,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🍪',
       title: '과자 종류',
-      placeholder: '과자 종류 (예: 포카칩, 홈런볼, 프링글스)',
+      placeholder: '과자 종류 (쉼표로 여러 개 가능)',
+      presets: ['포카칩', '홈런볼', '프링글스', '새우깡', '먹태깡', '꼬북칩', '초코송이'],
     };
   }
   if (name.includes('마른안주') || name.includes('안주')) {
@@ -102,7 +120,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🦑',
       title: '마른안주 종류',
-      placeholder: '안주 종류 (예: 먹태, 육포, 오징어)',
+      placeholder: '안주 종류 (쉼표로 여러 개 가능)',
+      presets: ['먹태/황태', '육포', '버터구이오징어', '쥐포', '아귀포', '믹스견과류'],
     };
   }
   if (name.includes('보드게임') || (item.boardGames && item.boardGames.length > 0)) {
@@ -110,7 +129,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '🎲',
       title: '보드게임',
-      placeholder: '게임명 (예: 루미큐브, 할리갈리, 뱅)',
+      placeholder: '게임명 (쉼표로 여러 개 가능)',
+      presets: ['루미큐브', '할리갈리', '뱅(Bang!)', '스플렌더', '다빈치코드', '달무티', '클루'],
     };
   }
   if (item.subItems && item.subItems.length > 0) {
@@ -118,7 +138,8 @@ export function getSubItemConfig(item: PartyItem) {
       supported: true,
       icon: '📝',
       title: '세부 품목',
-      placeholder: '품목명 입력',
+      placeholder: '품목명 (쉼표로 여러 개 가능)',
+      presets: [],
     };
   }
   return {
@@ -126,6 +147,7 @@ export function getSubItemConfig(item: PartyItem) {
     icon: '',
     title: '',
     placeholder: '',
+    presets: [],
   };
 }
 
@@ -298,10 +320,23 @@ export default function ItemCard({
 
     const handleClaimClick = () => {
       if (isBoardGame) {
-        const game = window.prompt('가져오실 보드게임 이름을 적어주세요! (예: 스플렌더, 루미큐브, 할리갈리)');
+        const game = window.prompt('가져오실 보드게임 이름을 적어주세요! (예: 스플렌더, 루미큐브, 할리갈리)\n여러 개인 경우 쉼표(,)로 구분');
         if (game && game.trim()) {
           triggerCelebration();
-          onAddBoardGame?.(item.id, game.trim(), currentParticipant.id, currentParticipant.name);
+          const parts = game.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+          for (const p of parts) {
+            onAddBoardGame?.(item.id, p, currentParticipant.id, currentParticipant.name);
+          }
+          return;
+        }
+      } else if (subItemConfig.supported) {
+        const variety = window.prompt(`가져오실 ${subItemConfig.title}을(를) 적어주세요!\n여러 개인 경우 쉼표(,)로 구분 가능\n(추천: ${subItemConfig.presets.slice(0, 3).join(', ')})`);
+        if (variety && variety.trim()) {
+          triggerCelebration();
+          const parts = variety.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+          for (const p of parts) {
+            onAddSubItem?.(item.id, p, currentParticipant.id, currentParticipant.name);
+          }
           return;
         }
       }
@@ -469,7 +504,10 @@ export default function ItemCard({
                   e.preventDefault();
                   if (!inputGameName.trim()) return;
                   triggerCelebration();
-                  onAddBoardGame?.(item.id, inputGameName.trim(), currentParticipant.id, currentParticipant.name);
+                  const parts = inputGameName.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+                  for (const p of parts) {
+                    onAddBoardGame?.(item.id, p, currentParticipant.id, currentParticipant.name);
+                  }
                   setInputGameName('');
                 }}
                 className="flex items-center gap-1 pt-0.5"
@@ -478,7 +516,7 @@ export default function ItemCard({
                   type="text"
                   value={inputGameName}
                   onChange={(e) => setInputGameName(e.target.value)}
-                  placeholder="게임명 (예: 루미큐브)"
+                  placeholder={subItemConfig.placeholder}
                   className="min-w-0 flex-1 px-2 py-1 text-[11px] rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden"
                 />
                 <button
@@ -489,6 +527,47 @@ export default function ItemCard({
                   + 등록
                 </button>
               </form>
+
+              {/* Quick Board Game Presets */}
+              {subItemConfig.presets && subItemConfig.presets.length > 0 && (
+                <div className="pt-1.5 border-t border-amber-200/50 dark:border-amber-800/40 space-y-1">
+                  <div className="text-[10px] text-amber-800/80 dark:text-amber-300/80 font-medium">
+                    💡 빠른 선택 (터치해서 여러 개 추가):
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {subItemConfig.presets.map((preset) => {
+                      const isMine = boardGamesList.some(
+                        (bg) => bg.participantId === currentParticipant.id && bg.gameName.toLowerCase() === preset.toLowerCase()
+                      );
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => {
+                            if (isMine) {
+                              const found = boardGamesList.find(
+                                (bg) => bg.participantId === currentParticipant.id && bg.gameName.toLowerCase() === preset.toLowerCase()
+                              );
+                              if (found) onRemoveBoardGame?.(item.id, found.id);
+                            } else {
+                              triggerCelebration();
+                              onAddBoardGame?.(item.id, preset, currentParticipant.id, currentParticipant.name);
+                            }
+                          }}
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all active:scale-95 flex items-center gap-0.5 ${
+                            isMine
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-2xs font-bold'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-amber-200/80 dark:border-amber-800/60 hover:bg-amber-100/60'
+                          }`}
+                        >
+                          <span>{isMine ? '✓' : '+'}</span>
+                          <span>{preset}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -541,7 +620,10 @@ export default function ItemCard({
                   e.preventDefault();
                   if (!inputSubItemName.trim()) return;
                   triggerCelebration();
-                  onAddSubItem?.(item.id, inputSubItemName.trim(), currentParticipant.id, currentParticipant.name);
+                  const parts = inputSubItemName.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+                  for (const p of parts) {
+                    onAddSubItem?.(item.id, p, currentParticipant.id, currentParticipant.name);
+                  }
                   setInputSubItemName('');
                 }}
                 className="flex items-center gap-1 pt-0.5"
@@ -561,6 +643,47 @@ export default function ItemCard({
                   + 등록
                 </button>
               </form>
+
+              {/* Quick Preset Chips for shared_single */}
+              {subItemConfig.presets && subItemConfig.presets.length > 0 && (
+                <div className="pt-1.5 border-t border-amber-200/50 dark:border-amber-800/40 space-y-1">
+                  <div className="text-[10px] text-amber-800/80 dark:text-amber-300/80 font-medium">
+                    💡 빠른 선택 (터치해서 여러 개 추가):
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {subItemConfig.presets.map((preset) => {
+                      const isMine = subItemsList.some(
+                        (s) => s.participantId === currentParticipant.id && s.name.toLowerCase() === preset.toLowerCase()
+                      );
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => {
+                            if (isMine) {
+                              const found = subItemsList.find(
+                                (s) => s.participantId === currentParticipant.id && s.name.toLowerCase() === preset.toLowerCase()
+                              );
+                              if (found) onRemoveSubItem?.(item.id, found.id);
+                            } else {
+                              triggerCelebration();
+                              onAddSubItem?.(item.id, preset, currentParticipant.id, currentParticipant.name);
+                            }
+                          }}
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all active:scale-95 flex items-center gap-0.5 ${
+                            isMine
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-2xs font-bold'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-amber-200/80 dark:border-amber-800/60 hover:bg-amber-100/60'
+                          }`}
+                        >
+                          <span>{isMine ? '✓' : '+'}</span>
+                          <span>{preset}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -851,7 +974,10 @@ export default function ItemCard({
                 e.preventDefault();
                 if (!inputSubItemName.trim()) return;
                 triggerCelebration();
-                onAddSubItem?.(item.id, inputSubItemName.trim(), currentParticipant.id, currentParticipant.name);
+                const parts = inputSubItemName.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+                for (const p of parts) {
+                  onAddSubItem?.(item.id, p, currentParticipant.id, currentParticipant.name);
+                }
                 setInputSubItemName('');
               }}
               className="flex items-center gap-1 pt-0.5"
@@ -871,6 +997,47 @@ export default function ItemCard({
                 + 등록
               </button>
             </form>
+
+            {/* Quick Preset Chips for shared_quantity */}
+            {subItemConfig.presets && subItemConfig.presets.length > 0 && (
+              <div className="pt-1.5 border-t border-amber-200/50 dark:border-amber-800/40 space-y-1">
+                <div className="text-[10px] text-amber-800/80 dark:text-amber-300/80 font-medium">
+                  💡 빠른 선택 (터치해서 여러 개 추가):
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {subItemConfig.presets.map((preset) => {
+                    const isMine = subItemsList.some(
+                      (s) => s.participantId === currentParticipant.id && s.name.toLowerCase() === preset.toLowerCase()
+                    );
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          if (isMine) {
+                            const found = subItemsList.find(
+                              (s) => s.participantId === currentParticipant.id && s.name.toLowerCase() === preset.toLowerCase()
+                            );
+                            if (found) onRemoveSubItem?.(item.id, found.id);
+                          } else {
+                            triggerCelebration();
+                            onAddSubItem?.(item.id, preset, currentParticipant.id, currentParticipant.name);
+                          }
+                        }}
+                        className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-all active:scale-95 flex items-center gap-0.5 ${
+                          isMine
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-2xs font-bold'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-amber-200/80 dark:border-amber-800/60 hover:bg-amber-100/60'
+                        }`}
+                      >
+                        <span>{isMine ? '✓' : '+'}</span>
+                        <span>{preset}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

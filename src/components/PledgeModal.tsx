@@ -11,7 +11,7 @@ interface PledgeModalProps {
   onClose: () => void;
   item: PartyItem | null;
   currentParticipant: Participant;
-  onSavePledge: (itemId: string, quantity: number, note?: string) => void;
+  onSavePledge: (itemId: string, quantity: number, note?: string, selectedVarieties?: string[]) => void;
   onCancelPledge: (itemId: string) => void;
 }
 
@@ -27,26 +27,35 @@ export default function PledgeModal({
 }: PledgeModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
+  const [selectedVarieties, setSelectedVarieties] = useState<string[]>([]);
+  const [customVarietyInput, setCustomVarietyInput] = useState('');
 
   useEffect(() => {
     if (item && isOpen) {
       const myContrib = (item.contributions || []).find(
         (c) => c.participantId === currentParticipant.id
       );
+      // Preload my registered sub-items
+      const myExistingSubs = (item.subItems || [])
+        .filter((s) => s.participantId === currentParticipant.id)
+        .map((s) => s.name);
+
       if (myContrib) {
         setQuantity(myContrib.quantity);
         setNote(myContrib.note || '');
+        setSelectedVarieties(myExistingSubs);
       } else {
         const currentSum = (item.contributions || []).reduce((acc, c) => acc + c.quantity, 0);
         const remaining = Math.max(1, (item.targetQuantity || 1) - currentSum);
-        // Default to remaining or sensible step
         if (item.unit === 'g') {
           setQuantity(Math.min(remaining, 1000));
         } else {
           setQuantity(Math.min(remaining, 2));
         }
         setNote('');
+        setSelectedVarieties(myExistingSubs);
       }
+      setCustomVarietyInput('');
     }
   }, [item, currentParticipant, isOpen]);
 
@@ -59,32 +68,37 @@ export default function PledgeModal({
   const myContrib = contributions.find((c) => c.participantId === currentParticipant.id);
   const remaining = Math.max(0, target - (currentTotal - (myContrib?.quantity || 0)));
   const subConfig = getSubItemConfig(item);
+  const isGrams = unit === 'g';
 
-  let currentNotePresets = NOTE_PRESETS;
-  const itemName = (item.name || '').toLowerCase();
-  if (itemName.includes('칵테일') || itemName.includes('양주') || itemName.includes('와인') || itemName.includes('위스키') || itemName.includes('하이볼')) {
-    currentNotePresets = ['진토닉', '모히또', '하이볼', '깔루아', '위스키', ...NOTE_PRESETS];
-  } else if (itemName.includes('고기') || itemName.includes('삼겹살') || itemName.includes('목살')) {
-    currentNotePresets = ['삼겹살', '목살', '소고기', '항정살', ...NOTE_PRESETS];
-  } else if (itemName.includes('맥주')) {
-    currentNotePresets = ['카스', '테라', '켈리', '아사히', '칭따오', ...NOTE_PRESETS];
-  } else if (itemName.includes('소주')) {
-    currentNotePresets = ['참이슬', '처음처럼', '새로', '진로', ...NOTE_PRESETS];
-  } else if (itemName.includes('음료')) {
-    currentNotePresets = ['제로콜라', '사이다', '환타', '토닉워터', ...NOTE_PRESETS];
-  } else if (itemName.includes('찌개') || itemName.includes('밀키트')) {
-    currentNotePresets = ['부대찌개', '김치찌개', '된장찌개', '어묵탕', ...NOTE_PRESETS];
-  } else if (itemName.includes('상비약')) {
-    currentNotePresets = ['타이레놀', '소화제', '밴드', '소독약', ...NOTE_PRESETS];
-  } else if (itemName.includes('소세지') || itemName.includes('소시지')) {
-    currentNotePresets = ['그릴소세지', '킬바사', '프랑크', '비엔나', ...NOTE_PRESETS];
-  } else if (itemName.includes('라면')) {
-    currentNotePresets = ['신라면', '진라면', '너구리', '짜파게티', '불닭', ...NOTE_PRESETS];
-  } else if (itemName.includes('과자')) {
-    currentNotePresets = ['포카칩', '새우깡', '홈런볼', '프링글스', '먹태깡', ...NOTE_PRESETS];
-  } else if (itemName.includes('마른안주') || itemName.includes('안주')) {
-    currentNotePresets = ['먹태', '육포', '오징어', '쥐포', '견과류', ...NOTE_PRESETS];
-  }
+  const toggleVariety = (variety: string) => {
+    setSelectedVarieties((prev) => {
+      const exists = prev.includes(variety);
+      const next = exists ? prev.filter((v) => v !== variety) : [...prev, variety];
+      // If quantity is in discrete units and less than chosen varieties count, auto-bump quantity!
+      if (!isGrams && next.length > quantity) {
+        setQuantity(next.length);
+      }
+      return next;
+    });
+  };
+
+  const handleAddCustomVariety = (e: React.FormEvent | React.MouseEvent) => {
+    e.preventDefault();
+    const trimmed = customVarietyInput.trim();
+    if (!trimmed) return;
+    const split = trimmed.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+    setSelectedVarieties((prev) => {
+      const next = [...prev];
+      for (const s of split) {
+        if (!next.includes(s)) next.push(s);
+      }
+      if (!isGrams && next.length > quantity) {
+        setQuantity(next.length);
+      }
+      return next;
+    });
+    setCustomVarietyInput('');
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +114,13 @@ export default function PledgeModal({
       // safe fallback
     }
 
-    onSavePledge(item.id, quantity, note.trim() || undefined);
+    const finalNote = note.trim()
+      ? note.trim()
+      : selectedVarieties.length > 0
+      ? selectedVarieties.join(', ')
+      : undefined;
+
+    onSavePledge(item.id, quantity, finalNote, selectedVarieties);
     onClose();
   };
 
@@ -111,7 +131,6 @@ export default function PledgeModal({
     }
   };
 
-  const isGrams = unit === 'g';
   const presetAmounts = isGrams
     ? [500, 1000, 1500, remaining]
     : [1, 2, 3, 5, remaining].filter((v, idx, arr) => v > 0 && arr.indexOf(v) === idx);
@@ -172,42 +191,110 @@ export default function PledgeModal({
           </div>
         </div>
 
-        {/* Sub-item preview if supported */}
-        {subConfig.supported && (
-          <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 mb-4 space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-bold text-amber-900 dark:text-amber-200">
-              <span className="flex items-center gap-1">
-                <span>{subConfig.icon}</span>
-                <span>등록된 {subConfig.title} ({(item.subItems || []).length}개)</span>
-              </span>
-            </div>
-            {(item.subItems || []).length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {(item.subItems || []).map((s) => (
-                  <span
-                    key={s.id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 font-medium text-amber-800 dark:text-amber-300 shadow-2xs"
-                  >
-                    <span>{subConfig.icon} {s.name}</span>
-                    <span className="text-slate-400 text-[10px]">({s.participantName})</span>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
-                아직 등록된 종류가 없습니다. 카드에서 세부 종류를 추가하거나 아래 메모에 적어주세요!
-              </p>
-            )}
-          </div>
-        )}
-
         {/* Form */}
         <form onSubmit={handleSave} className="space-y-4">
+
+          {/* Multi-variety selection section if supported */}
+          {subConfig.supported && (
+            <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-950 dark:text-amber-200 flex items-center gap-1">
+                  <span>{subConfig.icon}</span>
+                  <span>{subConfig.title} 선택 (여러 종류 선택 가능!)</span>
+                </span>
+                {selectedVarieties.length > 0 && (
+                  <span className="text-[11px] font-black text-amber-600 dark:text-amber-400">
+                    {selectedVarieties.length}종류 선택됨
+                  </span>
+                )}
+              </div>
+
+              {/* Selected varieties pills */}
+              {selectedVarieties.length > 0 ? (
+                <div className="flex flex-wrap gap-1 p-2 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-200 dark:border-amber-900/60">
+                  {selectedVarieties.map((v) => (
+                    <span
+                      key={v}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs bg-amber-100 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-bold border border-amber-300 dark:border-amber-700 shadow-2xs"
+                    >
+                      <span>{subConfig.icon} {v}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleVariety(v)}
+                        className="text-amber-700 hover:text-rose-600 font-black ml-0.5 text-xs"
+                        title="선택 해제"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-amber-800/70 dark:text-amber-300/70">
+                  가져올 종류를 아래 추천 목록에서 클릭하거나 직접 입력해주세요!
+                </p>
+              )}
+
+              {/* Preset buttons */}
+              {subConfig.presets && subConfig.presets.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
+                    인기 종류 빠른 선택 (클릭 시 추가/해제):
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {subConfig.presets.map((preset) => {
+                      const isSelected = selectedVarieties.includes(preset);
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => toggleVariety(preset)}
+                          className={`px-2 py-1 rounded-xl text-xs font-bold border transition-all active:scale-95 flex items-center gap-0.5 ${
+                            isSelected
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-amber-200/90 dark:border-amber-800/60 hover:bg-amber-100/60'
+                          }`}
+                        >
+                          <span>{isSelected ? '✓' : '+'}</span>
+                          <span>{preset}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Direct variety input */}
+              <div className="flex items-center gap-1 pt-0.5">
+                <input
+                  type="text"
+                  value={customVarietyInput}
+                  onChange={(e) => setCustomVarietyInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCustomVariety(e);
+                    }
+                  }}
+                  placeholder="목록에 없는 종류 직접 입력 (쉼표로 여러 개 가능)"
+                  className="min-w-0 flex-1 px-2.5 py-1 text-xs rounded-xl border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomVariety}
+                  disabled={!customVarietyInput.trim()}
+                  className="px-2.5 py-1 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white shadow-xs transition-all active:scale-95 flex-shrink-0"
+                >
+                  + 추가
+                </button>
+              </div>
+            </div>
+          )}
           
           {/* Quantity Input & Stepper */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-              내가 가져갈 수량 ({unit})
+              내가 가져갈 총 수량 ({unit})
             </label>
             
             <div className="flex items-center gap-2">
@@ -265,23 +352,23 @@ export default function PledgeModal({
           {/* Note Input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              {subConfig.supported ? `${subConfig.title} / 메모 (선택)` : '준비 방법 / 메모 (선택)'}
+              기타 메모 / 준비 방법 (선택)
             </label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={subConfig.supported ? `예: ${subConfig.placeholder}` : "예: 집에서 가져옴, 마트 구매 예정, 쿠팡 주문 등"}
+              placeholder="예: 집에서 가져옴, 마트 구매 예정, 쿠팡 주문 등"
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
             />
 
             {/* Quick Note Presets */}
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              {currentNotePresets.map((preset) => (
+              {NOTE_PRESETS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
-                  onClick={() => setNote(preset)}
+                  onClick={() => setNote((prev) => prev ? `${prev}, ${preset}` : preset)}
                   className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 transition-colors"
                 >
                   {preset}

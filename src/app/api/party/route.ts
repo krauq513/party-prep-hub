@@ -104,21 +104,44 @@ export async function POST(req: Request) {
       }
 
       case 'add_sub_item': {
-        const { itemId, name, participantId, participantName } = payload;
-        const subName = (name || '').trim();
-        if (!subName) break;
+        const { itemId, name, names, participantId, participantName } = payload;
+        const namesToAdd: string[] = [];
+        if (Array.isArray(names)) {
+          for (const n of names) {
+            const trimmed = (n || '').trim();
+            if (trimmed && !namesToAdd.includes(trimmed)) namesToAdd.push(trimmed);
+          }
+        }
+        if (name && typeof name === 'string') {
+          const split = name.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+          for (const s of split) {
+            if (!namesToAdd.includes(s)) namesToAdd.push(s);
+          }
+        }
+        if (namesToAdd.length === 0) break;
 
         updatedData.items = updatedData.items.map((item) => {
           if (item.id !== itemId) return item;
           const currentSubs = item.subItems || [];
-          const newSub: CustomSubItem = {
-            id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            name: subName,
-            participantId,
-            participantName,
-            createdAt: new Date().toISOString(),
-          };
-          const nextSubs = [...currentSubs, newSub];
+          const newSubs: CustomSubItem[] = [];
+
+          for (const sName of namesToAdd) {
+            const alreadyExists = currentSubs.some(
+              (cs) => cs.participantId === participantId && cs.name.trim().toLowerCase() === sName.toLowerCase()
+            );
+            if (!alreadyExists) {
+              newSubs.push({
+                id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                name: sName,
+                participantId,
+                participantName,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
+
+          if (newSubs.length === 0) return item;
+          const nextSubs = [...currentSubs, ...newSubs];
 
           // If shared_quantity, also ensure contribution quantity >= mySubCount
           let nextContribs = item.contributions || [];
@@ -154,16 +177,14 @@ export async function POST(req: Request) {
           // If board game, also sync boardGames
           let nextGames = item.boardGames || [];
           if (item.name.includes('보드게임') || item.boardGames) {
-            nextGames = [
-              ...nextGames,
-              {
-                id: newSub.id,
-                gameName: newSub.name,
-                participantId,
-                participantName,
-                createdAt: newSub.createdAt,
-              },
-            ];
+            const gamesToAdd = newSubs.map((ns) => ({
+              id: ns.id,
+              gameName: ns.name,
+              participantId,
+              participantName,
+              createdAt: ns.createdAt,
+            }));
+            nextGames = [...nextGames, ...gamesToAdd];
           }
 
           return {
@@ -304,7 +325,7 @@ export async function POST(req: Request) {
       }
 
       case 'update_quantity_contribution': {
-        const { itemId, participantId, participantName, quantity, note } = payload;
+        const { itemId, participantId, participantName, quantity, note, subItemNames } = payload;
         updatedData.items = updatedData.items.map((item) => {
           if (item.id !== itemId) return item;
           const currentContribs = item.contributions || [];
@@ -341,9 +362,27 @@ export async function POST(req: Request) {
             });
           }
 
+          // If subItemNames was passed (from multi-variety selection)
+          let nextSubs = item.subItems || [];
+          if (Array.isArray(subItemNames)) {
+            const otherSubs = nextSubs.filter((s) => s.participantId !== participantId);
+            const myNewSubs: CustomSubItem[] = subItemNames
+              .map((n: string) => (n || '').trim())
+              .filter(Boolean)
+              .map((n: string, idx: number) => ({
+                id: `sub-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+                name: n,
+                participantId,
+                participantName,
+                createdAt: new Date().toISOString(),
+              }));
+            nextSubs = [...otherSubs, ...myNewSubs];
+          }
+
           return {
             ...item,
             contributions: newContribs,
+            subItems: nextSubs,
             updatedAt: new Date().toISOString(),
           };
         });

@@ -45,12 +45,15 @@ export default function ReportModal({
         const assignees = i.assignees || (i.assigneeId ? [{ id: itemAssigneeId(i), name: i.assigneeName || '' }] : []);
         const hasAssignee = assignees.some((a) => a.id === p.id);
         const hasBoardGame = (i.boardGames || []).some((bg) => bg.participantId === p.id);
-        return hasAssignee || hasBoardGame;
+        const hasSubItem = (i.subItems || []).some((s) => s.participantId === p.id);
+        return hasAssignee || hasBoardGame || hasSubItem;
       })
       .map((i) => {
         const myGames = (i.boardGames || []).filter((bg) => bg.participantId === p.id).map((bg) => bg.gameName);
-        if (myGames.length > 0) {
-          return `${i.name} [${myGames.join(', ')}]`;
+        const mySubs = (i.subItems || []).filter((s) => s.participantId === p.id).map((s) => s.name);
+        const combined = Array.from(new Set([...myGames, ...mySubs]));
+        if (combined.length > 0) {
+          return `${i.name} [${combined.join(', ')}]`;
         }
         return i.name;
       });
@@ -59,7 +62,11 @@ export default function ReportModal({
       .filter((i) => i.type === 'shared_quantity')
       .map((i) => {
         const c = (i.contributions || []).find((contrib) => contrib.participantId === p.id);
-        return c ? `${i.name} ${c.quantity}${i.unit}` : null;
+        const mySubs = (i.subItems || []).filter((s) => s.participantId === p.id).map((s) => s.name);
+        if (!c && mySubs.length === 0) return null;
+        const qtyStr = c ? `${c.quantity}${i.unit}` : '';
+        const subStr = mySubs.length > 0 ? ` [${mySubs.join(', ')}]` : '';
+        return `${i.name} ${qtyStr}${subStr}`.trim();
       })
       .filter(Boolean) as string[];
 

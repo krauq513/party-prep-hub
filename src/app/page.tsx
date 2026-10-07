@@ -241,7 +241,12 @@ export default function PartyPrepPage() {
   };
 
   // 찜하기 저장
-  const handleSavePledge = (itemId: string, quantity: number, note?: string) => {
+  const handleSavePledge = (
+    itemId: string,
+    quantity: number,
+    note?: string,
+    selectedVarieties?: string[]
+  ) => {
     setPartyData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
@@ -265,7 +270,25 @@ export default function PartyPrepPage() {
             note,
           });
         }
-        return { ...item, contributions: newContribs };
+
+        // 선택된 종류가 전달된 경우 subItems 동기화
+        let nextSubs = item.subItems || [];
+        if (Array.isArray(selectedVarieties)) {
+          const otherSubs = nextSubs.filter((s) => s.participantId !== currentParticipant.id);
+          const myNewSubs: CustomSubItem[] = selectedVarieties
+            .map((n) => (n || '').trim())
+            .filter(Boolean)
+            .map((n, idx) => ({
+              id: `sub-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+              name: n,
+              participantId: currentParticipant.id,
+              participantName: currentParticipant.name,
+              createdAt: new Date().toISOString(),
+            }));
+          nextSubs = [...otherSubs, ...myNewSubs];
+        }
+
+        return { ...item, contributions: newContribs, subItems: nextSubs };
       }),
     }));
 
@@ -275,6 +298,7 @@ export default function PartyPrepPage() {
       participantName: currentParticipant.name,
       quantity,
       note,
+      subItemNames: selectedVarieties,
     });
   };
 
@@ -359,86 +383,38 @@ export default function PartyPrepPage() {
     sendAction('clear_trash', {});
   };
 
-  const handleSaveBoardGame = (itemId: string, gameName: string, participantId: string, participantName: string) => {
-    const newBg = {
-      id: `bg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      gameName,
-      participantId,
-      participantName,
-      createdAt: new Date().toISOString(),
-    };
-
-    setPartyData((prev) => ({
-      ...prev,
-      items: prev.items.map((item) => {
-        if (item.id !== itemId) return item;
-        const currentGames = item.boardGames || [];
-        const nextGames = [...currentGames, newBg];
-
-        const currentAssignees = item.assignees || (item.assigneeId ? [{ id: item.assigneeId, name: item.assigneeName || '' }] : []);
-        const exists = currentAssignees.some((a) => a.id === participantId);
-        const nextAssignees = exists
-          ? currentAssignees
-          : [...currentAssignees, { id: participantId, name: participantName }];
-
-        return {
-          ...item,
-          boardGames: nextGames,
-          assignees: nextAssignees,
-          assigneeId: nextAssignees[0]?.id,
-          assigneeName: nextAssignees[0]?.name,
-          isCompleted: true,
-        };
-      }),
-    }));
-
-    sendAction('add_board_game', { itemId, gameName, participantId, participantName });
-  };
-
-  const handleRemoveBoardGame = (itemId: string, gameId: string) => {
-    setPartyData((prev) => ({
-      ...prev,
-      items: prev.items.map((item) => {
-        if (item.id !== itemId) return item;
-        const currentGames = item.boardGames || [];
-        const nextGames = currentGames.filter((g) => g.id !== gameId);
-
-        const remainingParticipantIds = new Set(nextGames.map((g) => g.participantId));
-        const currentAssignees = item.assignees || [];
-        const nextAssignees = currentAssignees.filter((a) => remainingParticipantIds.has(a.id));
-
-        return {
-          ...item,
-          boardGames: nextGames,
-          assignees: nextAssignees,
-          assigneeId: nextAssignees[0]?.id,
-          assigneeName: nextAssignees[0]?.name,
-          isCompleted: nextGames.length > 0,
-        };
-      }),
-    }));
-
-    sendAction('remove_board_game', { itemId, gameId });
-  };
-
   const handleSaveSubItem = (itemId: string, name: string, participantId: string, participantName: string) => {
-    const subName = (name || '').trim();
-    if (!subName) return;
-
-    const newSub: CustomSubItem = {
-      id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      name: subName,
-      participantId,
-      participantName,
-      createdAt: new Date().toISOString(),
-    };
+    const parts = (name || '')
+      .split(/[,/]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
 
     setPartyData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
         if (item.id !== itemId) return item;
         const currentSubs = item.subItems || [];
-        const nextSubs = [...currentSubs, newSub];
+
+        const newSubs: CustomSubItem[] = [];
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i];
+          const exists = currentSubs.some(
+            (cs) => cs.participantId === participantId && cs.name.trim().toLowerCase() === p.toLowerCase()
+          );
+          if (!exists) {
+            newSubs.push({
+              id: `sub-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`,
+              name: p,
+              participantId,
+              participantName,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+
+        if (newSubs.length === 0) return item;
+        const nextSubs = [...currentSubs, ...newSubs];
 
         // If shared_quantity, also ensure contribution quantity >= mySubCount
         let nextContribs = item.contributions || [];
@@ -466,16 +442,14 @@ export default function PartyPrepPage() {
         // If board game, also sync boardGames
         let nextGames = item.boardGames || [];
         if (item.name.includes('보드게임') || item.boardGames) {
-          nextGames = [
-            ...nextGames,
-            {
-              id: newSub.id,
-              gameName: newSub.name,
-              participantId,
-              participantName,
-              createdAt: newSub.createdAt,
-            },
-          ];
+          const gamesToAdd = newSubs.map((ns) => ({
+            id: ns.id,
+            gameName: ns.name,
+            participantId,
+            participantName,
+            createdAt: ns.createdAt,
+          }));
+          nextGames = [...nextGames, ...gamesToAdd];
         }
 
         // If shared_single, ensure participant is in assignees
@@ -499,7 +473,15 @@ export default function PartyPrepPage() {
       }),
     }));
 
-    sendAction('add_sub_item', { itemId, name: subName, participantId, participantName });
+    sendAction('add_sub_item', { itemId, names: parts, participantId, participantName });
+  };
+
+  const handleSaveBoardGame = (itemId: string, gameName: string, participantId: string, participantName: string) => {
+    handleSaveSubItem(itemId, gameName, participantId, participantName);
+  };
+
+  const handleRemoveBoardGame = (itemId: string, gameId: string) => {
+    handleRemoveSubItem(itemId, gameId);
   };
 
   const handleRemoveSubItem = (itemId: string, subId: string) => {
